@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	
+  <PropertyGroup>
+	<TargetFramework>net9.0</TargetFramework>
+	<ImplicitUsings>enable</ImplicitUsings>
+	<Nullable>enable</Nullable>
+  </PropertyGroup>
+	
+  <ItemGroup>
+    <None Remove="Templates\EmailConfirmation.html" />
+    <None Remove="Templates\PasswordReset.html" />
+  </ItemGroup>
+	
+  <ItemGroup>
+    <EmbeddedResource Include="Templates\EmailConfirmation.html" />
+    <EmbeddedResource Include="Templates\PasswordReset.html" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Shared\SharpInvoice.Shared.Infrastructure\SharpInvoice.Shared.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\UserManagement\SharpInvoice.Modules.UserManagement.Application\SharpInvoice.Modules.UserManagement.Application.csproj" />
+    <ProjectReference Include="..\SharpInvoice.Modules.Auth.Application\SharpInvoice.Modules.Auth.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.6" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.6" />
+    <PackageReference Include="SendGrid" Version="9.29.3" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.12.1" />
+  </ItemGroup>
+
+</Project>
