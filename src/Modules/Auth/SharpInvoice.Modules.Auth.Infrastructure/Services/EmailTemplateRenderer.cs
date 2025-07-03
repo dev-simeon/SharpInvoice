@@ -3,6 +3,7 @@ namespace SharpInvoice.Modules.Auth.Infrastructure.Services;
 using SharpInvoice.Modules.Auth.Application.Interfaces;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Reflection;
 using System.Threading.Tasks;
 
@@ -26,7 +27,8 @@ public class EmailTemplateRenderer : IEmailTemplateRenderer
 
         foreach (var entry in data)
         {
-            templateContent = templateContent.Replace($"{{{{{entry.Key}}}}}", entry.Value);
+            var safeValue = WebUtility.HtmlEncode(entry.Value);
+            templateContent = templateContent.Replace($"{{{{{entry.Key}}}}}", safeValue);
         }
 
         return templateContent;

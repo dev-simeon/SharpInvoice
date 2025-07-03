@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SharpInvoice.Modules.UserManagement.Application.Interfaces;
 using SharpInvoice.Modules.UserManagement.Application.Dtos;
-using System.Security.Claims;
+using SharpInvoice.Shared.Infrastructure.Interfaces;
+using Swashbuckle.AspNetCore.Filters;
+using SharpInvoice.API.Examples;
 
 /// <summary>
 /// Provides endpoints for managing the authenticated user's profile.
@@ -13,24 +15,24 @@ using System.Security.Claims;
 [Route("api/user")]
 [Authorize]
 [Tags("User Profile")]
-public class UserController(IProfileService profileService, IHttpContextAccessor httpContextAccessor) : ControllerBase
+[Produces("application/json")]
+public class UserController(IProfileService profileService, ICurrentUserProvider currentUserProvider) : ControllerBase
 {
-    private Guid GetCurrentUserId()
-    {
-        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(userId, out var id) ? id : throw new UnauthorizedAccessException("User is not authenticated.");
-    }
-
     /// <summary>
     /// Gets the profile of the currently authenticated user.
     /// </summary>
+    /// <returns>The user's profile information including personal details.</returns>
     [HttpGet("me")]
-    [ProducesResponseType(typeof(ProfileDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(void), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [EndpointName("Get Current User Profile")]
+    [EndpointSummary("Get the current user's profile")]
+    [EndpointDescription("Retrieves the profile information for the currently authenticated user")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ProfileDto))]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+    [SwaggerResponseExample(StatusCodes.Status200OK, typeof(ProfileDtoExample))]
     public async Task<IActionResult> GetMyProfile()
     {
-        var userId = GetCurrentUserId();
+        var userId = currentUserProvider.GetCurrentUserId();
         var user = await profileService.GetProfileAsync(userId);
         return Ok(user);
     }
@@ -38,15 +40,19 @@ public class UserController(IProfileService profileService, IHttpContextAccessor
     /// <summary>
     /// Updates the profile of the currently authenticated user.
     /// </summary>
-    /// <param name="dto">The updated user details.</param>
+    /// <param name="dto">The updated user details including name, avatar, and contact information.</param>
+    /// <returns>No content if the update was successful.</returns>
     [HttpPut("me")]
+    [EndpointName("Update Current User Profile")]
+    [EndpointSummary("Update the current user's profile")]
+    [EndpointDescription("Updates the personal information and settings for the currently authenticated user")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(typeof(void), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+    [SwaggerRequestExample(typeof(UpdateProfileDto), typeof(UpdateProfileDtoExample))]
     public async Task<IActionResult> UpdateMyProfile([FromBody] UpdateProfileDto dto)
     {
-        var userId = GetCurrentUserId();
+        var userId = currentUserProvider.GetCurrentUserId();
         await profileService.UpdateProfileAsync(userId, dto);
         return NoContent();
     }

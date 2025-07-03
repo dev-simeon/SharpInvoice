@@ -6,18 +6,16 @@ using SharpInvoice.Modules.UserManagement.Domain.Entities;
 using SharpInvoice.Shared.Kernel.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
-using Microsoft.AspNetCore.Http;
-using System.Security.Claims;
 using SharpInvoice.Shared.Infrastructure.Persistence;
+using SharpInvoice.Shared.Infrastructure.Interfaces;
+using System.IO;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
-public class BusinessService(AppDbContext context, IHttpContextAccessor httpContextAccessor) : IBusinessService
+public class BusinessService(AppDbContext context, ICurrentUserProvider currentUserProvider, IFileStorageService fileStorageService) : IBusinessService
 {
-    private Guid GetCurrentUserId()
-    {
-        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(userId, out var id) ? id : throw new UnauthorizedAccessException("User is not authenticated.");
-    }
-
     public async Task<BusinessDto> CreateBusinessForUserAsync(Guid userId, string businessName, string userEmail, string country)
     {
         var business = Business.Create(businessName, userId, country);
@@ -69,6 +67,23 @@ public class BusinessService(AppDbContext context, IHttpContextAccessor httpCont
         await context.SaveChangesAsync();
     }
 
+    public async Task UpdateBusinessLogoAsync(Guid businessId, Stream logoStream, string fileName)
+    {
+        var business = await context.Businesses.FindAsync(businessId)
+            ?? throw new NotFoundException($"Business with ID {businessId} not found.");
+
+        var currentUserId = currentUserProvider.GetCurrentUserId();
+        if (business.OwnerId != currentUserId)
+        {
+            throw new ForbidException("Only the business owner can update the logo.");
+        }
+
+        var logoUrl = await fileStorageService.SaveFileAsync(logoStream, fileName, "logos");
+        business.UpdateBranding(logoUrl, business.ThemeSettings);
+
+        await context.SaveChangesAsync();
+    }
+
     public async Task<Guid> GetBusinessIdByOwnerAsync(Guid userId)
     {
         var business = await context.Businesses
@@ -79,7 +94,7 @@ public class BusinessService(AppDbContext context, IHttpContextAccessor httpCont
 
     public async Task<IEnumerable<BusinessDto>> GetBusinessesForUserAsync(Guid userId)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = currentUserProvider.GetCurrentUserId();
         if (userId != currentUserId)
             throw new ForbidException("You can only view your own businesses.");
 
@@ -94,7 +109,7 @@ public class BusinessService(AppDbContext context, IHttpContextAccessor httpCont
         var business = await context.Businesses.FindAsync(businessId)
             ?? throw new NotFoundException($"Business with ID {businessId} not found.");
 
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = currentUserProvider.GetCurrentUserId();
         if (business.OwnerId != currentUserId)
             throw new ForbidException("Only the business owner can deactivate the business.");
 
@@ -107,7 +122,7 @@ public class BusinessService(AppDbContext context, IHttpContextAccessor httpCont
         var business = await context.Businesses.FindAsync(businessId)
             ?? throw new NotFoundException($"Business with ID {businessId} not found.");
 
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = currentUserProvider.GetCurrentUserId();
         if (business.OwnerId != currentUserId)
             throw new ForbidException("Only the business owner can activate the business.");
 

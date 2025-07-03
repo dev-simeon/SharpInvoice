@@ -7,22 +7,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using System.Security.Claims;
 using SharpInvoice.Modules.UserManagement.Application.Dtos;
 using SharpInvoice.Modules.UserManagement.Domain.Entities;
 using SharpInvoice.Shared.Kernel.Exceptions;
 using SharpInvoice.Modules.Auth.Application.Interfaces;
 using System.Security.Cryptography;
+using SharpInvoice.Shared.Infrastructure.Interfaces;
 
-public class TeamMemberService(AppDbContext context, IEmailSender emailSender, IHttpContextAccessor httpContextAccessor) : ITeamMemberService
+public class TeamMemberService(AppDbContext context, IEmailSender emailSender, ICurrentUserProvider currentUserProvider) : ITeamMemberService
 {
-    private Guid GetCurrentUserId()
-    {
-        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(userId, out var id) ? id : throw new UnauthorizedAccessException("User is not authenticated.");
-    }
-
     public async Task<IEnumerable<string>> GetUserRolesAsync(Guid userId, Guid businessId)
     {
         var roles = await context.TeamMembers
@@ -39,46 +32,57 @@ public class TeamMemberService(AppDbContext context, IEmailSender emailSender, I
         var business = await context.Businesses.FindAsync(businessId)
             ?? throw new NotFoundException($"Business with ID {businessId} not found.");
 
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = currentUserProvider.GetCurrentUserId();
         if (business.OwnerId != currentUserId)
             throw new ForbidException("Only the business owner can invite team members.");
 
-        var existingUser = await context.Users.FirstOrDefaultAsync(u => u.Email == email);
-        if (existingUser != null)
+        var invitedUser = await context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        
+        if (invitedUser != null)
         {
-            var isAlreadyTeamMember = await context.TeamMembers.AnyAsync(tm => tm.UserId == existingUser.Id && tm.BusinessId == businessId);
-            if (isAlreadyTeamMember)
-            {
-                throw new BadRequestException("This user is already a member of the business.");
-            }
+            // Check if user is already a team member
+            var existingMember = await context.TeamMembers
+                .FirstOrDefaultAsync(tm => tm.UserId == invitedUser.Id && tm.BusinessId == businessId);
+            
+            if (existingMember != null)
+                throw new BadRequestException("This user is already a team member.");
+
+            // Add user directly if they already exist
+            var teamMember = TeamMember.Create(invitedUser.Id, businessId, roleId);
+            context.TeamMembers.Add(teamMember);
+            await context.SaveChangesAsync();
+
+            // Send notification email
+            await SendTeamMemberAddedEmailAsync(email, business.Name);
         }
+        else
+        {
+            // Create an invitation if user doesn't exist
+            var invitationToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+            var invitation = Invitation.Create(businessId, email, roleId, invitationToken, 168); // 7 days expiry
+            context.Invitations.Add(invitation);
+            await context.SaveChangesAsync();
 
-        var invitation = Invitation.Create(businessId, email, roleId, Convert.ToHexString(RandomNumberGenerator.GetBytes(16)), 24);
-        context.Invitations.Add(invitation);
-        await context.SaveChangesAsync();
-
-        var invitationLink = $"https://yourapp.com/accept-invitation?token={invitation.Token}";
-        var mailBody = $"You have been invited to join {business.Name}. Please click the link to accept: {invitationLink}";
-        await emailSender.SendEmailAsync(email, $"Invitation to join {business.Name}", mailBody);
+            // Send invitation email
+            await SendInvitationEmailAsync(email, business.Name, invitationToken);
+        }
     }
 
     public async Task AcceptInvitationAsync(string token)
     {
         var invitation = await context.Invitations
-            .FirstOrDefaultAsync(i => i.Token == token && i.ExpiryDate > DateTime.UtcNow)
-            ?? throw new NotFoundException("Invalid or expired invitation token.");
+            .Include(i => i.Business)
+            .FirstOrDefaultAsync(i => i.Token == token && i.Status == InvitationStatus.Pending && i.ExpiryDate > DateTime.UtcNow)
+            ?? throw new NotFoundException("Invitation not found or has expired.");
 
-        var currentUserId = GetCurrentUserId();
-        var user = await context.Users.FindAsync(currentUserId)
-            ?? throw new NotFoundException("User not found.");
+        var user = await context.Users.FirstOrDefaultAsync(u => u.Email == invitation.InvitedUserEmail);
+        if (user == null)
+            throw new BadRequestException("You need to register an account first with the email in the invitation.");
 
-        if (user.Email != invitation.InvitedUserEmail)
-            throw new ForbidException("This invitation is for a different user.");
-
-        var teamMember = TeamMember.Create(currentUserId, invitation.BusinessId, invitation.RoleId);
+        var teamMember = TeamMember.Create(user.Id, invitation.BusinessId, invitation.RoleId);
         context.TeamMembers.Add(teamMember);
-        context.Invitations.Remove(invitation);
-
+        
+        invitation.Accept();
         await context.SaveChangesAsync();
     }
 
@@ -105,8 +109,8 @@ public class TeamMemberService(AppDbContext context, IEmailSender emailSender, I
         var teamMember = await context.TeamMembers.FindAsync(teamMemberId)
             ?? throw new NotFoundException($"Team member with ID {teamMemberId} not found.");
 
-        var business = await context.Businesses.FindAsync(teamMember.BusinessId);
-        var currentUserId = GetCurrentUserId();
+        var business = await context.Businesses.FindAsync(teamMember.BusinessId) ?? throw new NotFoundException($"Business with ID {teamMember.BusinessId} not found.");
+        var currentUserId = currentUserProvider.GetCurrentUserId();
         if (business.OwnerId != currentUserId)
             throw new ForbidException("Only the business owner can remove team members.");
 
@@ -121,16 +125,50 @@ public class TeamMemberService(AppDbContext context, IEmailSender emailSender, I
     {
         var teamMember = await context.TeamMembers.FindAsync(teamMemberId)
             ?? throw new NotFoundException($"Team member with ID {teamMemberId} not found.");
-        
-        var business = await context.Businesses.FindAsync(teamMember.BusinessId);
-        var currentUserId = GetCurrentUserId();
+
+        var business = await context.Businesses.FindAsync(teamMember.BusinessId)
+            ?? throw new NotFoundException($"Business with ID {teamMember.BusinessId} not found.");
+
+        var currentUserId = currentUserProvider.GetCurrentUserId();
         if (business.OwnerId != currentUserId)
             throw new ForbidException("Only the business owner can update team member roles.");
 
         if (teamMember.UserId == business.OwnerId)
             throw new BadRequestException("The business owner's role cannot be changed.");
-            
+
         teamMember.UpdateRole(newRoleId);
         await context.SaveChangesAsync();
+    }
+
+    private async Task SendInvitationEmailAsync(string email, string businessName, string token)
+    {
+        var invitationLink = $"https://sharpinvoice.com/accept-invitation?token={Uri.EscapeDataString(token)}";
+        var subject = $"You've been invited to join {businessName} on SharpInvoice";
+        var message = $@"
+            <h2>You've been invited!</h2>
+            <p>Hello,</p>
+            <p>You've been invited to join {businessName} on SharpInvoice. Click the link below to accept the invitation:</p>
+            <p><a href='{invitationLink}'>Accept Invitation</a></p>
+            <p>If you don't have a SharpInvoice account yet, you'll need to create one with this email address.</p>
+            <p>This invitation will expire in 7 days.</p>
+            <p>Thanks,<br>The SharpInvoice Team</p>
+        ";
+
+        await emailSender.SendEmailAsync(email, subject, message);
+    }
+
+    private async Task SendTeamMemberAddedEmailAsync(string email, string businessName)
+    {
+        var loginLink = "https://sharpinvoice.com/login";
+        var subject = $"You've been added to {businessName} on SharpInvoice";
+        var message = $@"
+            <h2>You've been added to a team!</h2>
+            <p>Hello,</p>
+            <p>You've been added as a team member to {businessName} on SharpInvoice. You can log in using your existing credentials to access this business.</p>
+            <p><a href='{loginLink}'>Log in to SharpInvoice</a></p>
+            <p>Thanks,<br>The SharpInvoice Team</p>
+        ";
+
+        await emailSender.SendEmailAsync(email, subject, message);
     }
 }

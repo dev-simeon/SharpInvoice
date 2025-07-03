@@ -2,6 +2,8 @@
 // It sets up the web server and the request processing pipeline.
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -17,9 +19,14 @@ using SharpInvoice.Modules.Auth.Application.Interfaces;
 using SharpInvoice.Modules.Auth.Infrastructure.Services;
 using SharpInvoice.Modules.UserManagement.Application.Interfaces;
 using SharpInvoice.Modules.UserManagement.Infrastructure.Services;
+using SharpInvoice.Shared.Infrastructure.Interfaces;
 using SharpInvoice.Shared.Infrastructure.Persistence;
+using SharpInvoice.Shared.Infrastructure.Services;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using System.Text;
 using System.Threading.RateLimiting;
+using Swashbuckle.AspNetCore.Filters;
 
 // --- 1. BOOTSTRAP SERILOG ---
 // Configure a logger for application startup. This is separate from the main
@@ -65,12 +72,13 @@ try
     // D. Application Services
     // Register application-specific services for dependency injection.
     builder.Services.AddScoped<IAuthService, AuthService>();
-    builder.Services.AddScoped<IUserService, UserService>();
     builder.Services.AddScoped<IBusinessService, BusinessService>();
     builder.Services.AddScoped<ITeamMemberService, TeamMemberService>();
     builder.Services.AddScoped<IProfileService, ProfileService>();
     builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
     builder.Services.AddScoped<IEmailTemplateRenderer, EmailTemplateRenderer>();
+    builder.Services.AddScoped<IFileStorageService, LocalStorageService>();
+    builder.Services.AddScoped<ICurrentUserProvider, CurrentUserProvider>();
 
     if (builder.Environment.IsDevelopment())
     {
@@ -101,6 +109,27 @@ try
     builder.Services.AddExceptionHandler<NotFoundExceptionHandler>();
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
     builder.Services.AddProblemDetails();
+    builder.Services.AddSingleton<ProblemDetailsFactory, ValidationProblemDetailsFactory>();
+    
+    // Configure validation behavior for automatic 400 responses
+    builder.Services.Configure<ApiBehaviorOptions>(options =>
+    {
+        options.SuppressModelStateInvalidFilter = false; // Enable automatic 400 responses
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var factory = context.HttpContext.RequestServices.GetRequiredService<ProblemDetailsFactory>();
+            var problemDetails = factory.CreateValidationProblemDetails(
+                context.HttpContext,
+                context.ModelState,
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "One or more validation errors occurred.");
+                
+            return new BadRequestObjectResult(problemDetails)
+            {
+                ContentTypes = { "application/problem+json" }
+            };
+        };
+    });
 
     // H. Rate Limiting
     builder.Services.AddRateLimiter(options =>
@@ -163,6 +192,10 @@ try
                           options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
                           options.SerializerSettings.Converters.Add(new StringEnumConverter());
                       });
+    builder.Services.AddFluentValidationAutoValidation();
+    builder.Services.AddFluentValidationClientsideAdapters();
+    builder.Services.AddValidatorsFromAssemblyContaining<SharpInvoice.API.Validators.Auth.RegisterUserCommandValidator>();
+    builder.Services.AddValidatorsFromAssemblyContaining<SharpInvoice.API.Validators.UserManagement.UpdateProfileDtoValidator>();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddMemoryCache();
     builder.Services.AddResponseCompression();
@@ -189,6 +222,13 @@ try
             await Task.CompletedTask;
         });
     });
+
+    // Add Swagger examples
+    builder.Services.AddSwaggerGen(c => 
+    {
+        c.ExampleFilters();
+    });
+    builder.Services.AddSwaggerExamplesFromAssemblyOf<Program>();
 
     // CORS: Allow any origin for development, restrict in production
     if (builder.Environment.IsDevelopment())

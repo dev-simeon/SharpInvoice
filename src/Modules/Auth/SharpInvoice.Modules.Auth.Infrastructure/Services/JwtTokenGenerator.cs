@@ -11,8 +11,6 @@ using System.Text;
 
 public class JwtTokenGenerator(IOptions<JwtSettings> jwtSettings) : IJwtTokenGenerator
 {
-    private readonly JwtSettings _jwtSettings = jwtSettings.Value;
-
     public string GenerateToken(User user, Guid businessId, IEnumerable<string> roles)
     {
         var claims = new List<Claim>
@@ -28,13 +26,13 @@ public class JwtTokenGenerator(IOptions<JwtSettings> jwtSettings) : IJwtTokenGen
             claims.Add(new Claim(ClaimTypes.Role, role));
         }
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Key));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Value.Key));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
-        var expires = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiresInMinutes);
+        var expires = DateTime.UtcNow.AddMinutes(jwtSettings.Value.ExpiresInMinutes);
 
         var token = new JwtSecurityToken(
-            issuer: _jwtSettings.Issuer,
-            audience: _jwtSettings.Audience,
+            issuer: jwtSettings.Value.Issuer,
+            audience: jwtSettings.Value.Audience,
             claims: claims,
             expires: expires,
             signingCredentials: creds
@@ -63,13 +61,13 @@ public class JwtTokenGenerator(IOptions<JwtSettings> jwtSettings) : IJwtTokenGen
             claims.Add(new Claim("permission", permission));
         }
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Key));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Value.Key));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
-        var expires = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiresInMinutes);
+        var expires = DateTime.UtcNow.AddMinutes(jwtSettings.Value.ExpiresInMinutes);
 
         var token = new JwtSecurityToken(
-            issuer: _jwtSettings.Issuer,
-            audience: _jwtSettings.Audience,
+            issuer: jwtSettings.Value.Issuer,
+            audience: jwtSettings.Value.Audience,
             claims: claims,
             expires: expires,
             signingCredentials: creds
