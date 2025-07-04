@@ -1,6 +1,4 @@
-namespace SharpInvoice.API.Configuration;
-
-using SharpInvoice.Shared.Infrastructure.Configuration;
+namespace SharpInvoice.Shared.Infrastructure.Configuration;
 
 /// <summary>
 /// Represents the application's configuration settings, binding values from appsettings.json.
@@ -8,15 +6,15 @@ using SharpInvoice.Shared.Infrastructure.Configuration;
 public class AppSettings
 {
     /// <summary>Gets or sets the database connection strings.</summary>
-    public ConnectionStringsSettings ConnenctionStrings { get; set; } = new();
+    public ConnectionStringsSettings ConnectionStrings { get; set; } = new();
     /// <summary>Gets or sets the JWT (JSON Web Token) settings.</summary>
     public JwtSettings Jwt { get; set; } = new();
     /// <summary>Gets or sets the settings for external authentication providers.</summary>
     public AuthenticationSettings Authentication { get; set; } = new();
     /// <summary>Gets or sets the settings for the SendGrid email service.</summary>
     public SendGridSettings SendGrid { get; set; } = new();
-    /// <summary>Gets or sets the settings for the Mailtrap email service.</summary>
-    public MailtrapSettings Mailtrap { get; set; } = new();
+    /// <summary>Gets or sets the base URL of the application.</summary>
+    public string AppUrl { get; set; } = "https://sharpinvoice.com";
 }
 
 /// <summary>
@@ -61,4 +59,4 @@ public class FacebookAuthSettings
     public string AppId { get; set; } = string.Empty;
     /// <summary>Gets or sets the Facebook application secret.</summary>
     public string AppSecret { get; set; } = string.Empty;
-}
+} 

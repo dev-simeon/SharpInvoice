@@ -1,8 +1,10 @@
-﻿namespace SharpInvoice.Modules.UserManagement.Domain.Entities;
+namespace SharpInvoice.Modules.UserManagement.Domain.Entities;
 
 using SharpInvoice.Shared.Kernel.Domain; // Using the new AuditableEntity
 using System.ComponentModel.DataAnnotations;
 using System.Text;
+using SharpInvoice.Shared.Kernel.Exceptions;
+using System.Text.Json;
 
 public sealed class Business : AuditableEntity<Guid>
 {
@@ -31,29 +33,63 @@ public sealed class Business : AuditableEntity<Guid>
     /// </summary>
     public string ThemeSettings { get; private set; }
 
-    public ICollection<TeamMember> TeamMembers { get; private set; } = [];
-    public ICollection<Invitation> Invitations { get; private set; } = [];
+    private readonly List<TeamMember> _teamMembers = [];
+    public IReadOnlyCollection<TeamMember> TeamMembers => _teamMembers.AsReadOnly();
+
+    private readonly List<Invitation> _invitations = [];
+    public IReadOnlyCollection<Invitation> Invitations => _invitations.AsReadOnly();
 
     private Business(Guid id, string name, Guid ownerId, string country) : base(id)
     {
-        Name = name; OwnerId = ownerId; Country = country; IsActive = true; ThemeSettings = "{}";
+        Name = name; // Assumes validation happens before this point
+        OwnerId = ownerId;
+        Country = country; // Assumes validation happens before this point
+        IsActive = true;
+        ThemeSettings = "{}";
     }
 
-    public static Business Create(string name, Guid ownerId, string country) => new(Guid.NewGuid(), name, ownerId, country);
+    public static Business Create(string name, Guid ownerId, string country)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new BadRequestException("Business name cannot be empty.");
+        if (string.IsNullOrWhiteSpace(country))
+            throw new BadRequestException("Country cannot be empty.");
+        
+        return new(Guid.NewGuid(), name, ownerId, country);
+    }
 
     public void UpdateDetails(string name, string? email, string? phone, string? website)
     {
-        Name = name; Email = email; PhoneNumber = phone; Website = website;
+        if (string.IsNullOrWhiteSpace(name))
+            throw new BadRequestException("Business name cannot be empty.");
+
+        Name = name; 
+        Email = email; 
+        PhoneNumber = phone; 
+        Website = website;
     }
 
     public void UpdateAddress(string? address, string? city, string? state, string? zip, string country)
     {
+        if (string.IsNullOrWhiteSpace(country))
+            throw new BadRequestException("Country cannot be empty.");
+
         Address = address; City = city; State = state; ZipCode = zip; Country = country;
     }
 
     public void UpdateBranding(string? logoUrl, string themeSettingsJson)
     {
-        LogoUrl = logoUrl; ThemeSettings = themeSettingsJson;
+        try
+        {
+            JsonDocument.Parse(themeSettingsJson);
+        }
+        catch (JsonException ex)
+        {
+            throw new BadRequestException($"Theme settings must be a valid JSON string. Details: {ex.Message}");
+        }
+
+        LogoUrl = logoUrl; 
+        ThemeSettings = themeSettingsJson;
     }
 
     public void Activate() => IsActive = true;

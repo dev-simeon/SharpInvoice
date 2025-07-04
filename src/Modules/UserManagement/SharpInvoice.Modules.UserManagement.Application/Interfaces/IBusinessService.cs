@@ -1,4 +1,4 @@
-﻿namespace SharpInvoice.Modules.UserManagement.Application.Interfaces;
+namespace SharpInvoice.Modules.UserManagement.Application.Interfaces;
 
 using SharpInvoice.Modules.UserManagement.Application.Dtos;
 using System;

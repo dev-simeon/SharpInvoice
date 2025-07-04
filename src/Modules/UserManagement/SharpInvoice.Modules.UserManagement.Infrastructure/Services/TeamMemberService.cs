@@ -75,10 +75,7 @@ public class TeamMemberService(AppDbContext context, IEmailSender emailSender, I
             .FirstOrDefaultAsync(i => i.Token == token && i.Status == InvitationStatus.Pending && i.ExpiryDate > DateTime.UtcNow)
             ?? throw new NotFoundException("Invitation not found or has expired.");
 
-        var user = await context.Users.FirstOrDefaultAsync(u => u.Email == invitation.InvitedUserEmail);
-        if (user == null)
-            throw new BadRequestException("You need to register an account first with the email in the invitation.");
-
+        var user = await context.Users.FirstOrDefaultAsync(u => u.Email == invitation.InvitedUserEmail) ?? throw new BadRequestException("You need to register an account first with the email in the invitation.");
         var teamMember = TeamMember.Create(user.Id, invitation.BusinessId, invitation.RoleId);
         context.TeamMembers.Add(teamMember);
         

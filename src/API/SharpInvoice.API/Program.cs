@@ -11,14 +11,13 @@ using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Scalar.AspNetCore;
-using SendGrid.Extensions.DependencyInjection;
 using Serilog;
-using SharpInvoice.API.Configuration;
 using SharpInvoice.API.ErrorHandling;
 using SharpInvoice.Modules.Auth.Application.Interfaces;
 using SharpInvoice.Modules.Auth.Infrastructure.Services;
 using SharpInvoice.Modules.UserManagement.Application.Interfaces;
 using SharpInvoice.Modules.UserManagement.Infrastructure.Services;
+using SharpInvoice.Shared.Infrastructure.Configuration;
 using SharpInvoice.Shared.Infrastructure.Interfaces;
 using SharpInvoice.Shared.Infrastructure.Persistence;
 using SharpInvoice.Shared.Infrastructure.Services;
@@ -27,6 +26,9 @@ using FluentValidation.AspNetCore;
 using System.Text;
 using System.Threading.RateLimiting;
 using Swashbuckle.AspNetCore.Filters;
+using Azure.Identity;
+using Azure.Security.KeyVault.Secrets;
+using Azure.Extensions.AspNetCore.Configuration.Secrets;
 
 // --- 1. BOOTSTRAP SERILOG ---
 // Configure a logger for application startup. This is separate from the main
@@ -41,6 +43,29 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
+    // --- AZURE KEY VAULT INTEGRATION ---
+    // Load secrets from Azure Key Vault for all environments.
+    var keyVaultEndpoint = builder.Configuration["KeyVault:Endpoint"];
+    if (!string.IsNullOrEmpty(keyVaultEndpoint))
+    {
+        try
+        {
+            var secretClient = new SecretClient(new Uri(keyVaultEndpoint), new DefaultAzureCredential());
+            builder.Configuration.AddAzureKeyVault(secretClient, new KeyVaultSecretManager());
+            Log.Information("Successfully connected to Azure Key Vault.");
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "Failed to connect to Azure Key Vault. Please check the endpoint and credentials.");
+            // We might want to throw here to prevent the app from starting with missing secrets.
+            throw; 
+        }
+    }
+    else
+    {
+        Log.Warning("KeyVault:Endpoint is not configured. Skipping Azure Key Vault integration.");
+    }
+
     // --- 2. CONFIGURE SERVICES ---
 
     // A. Logging (Serilog)
@@ -50,24 +75,25 @@ try
         config.ReadFrom.Configuration(context.Configuration));
 
     // B. Application Settings
-    // Bind the AppSettings section from configuration and register it as a singleton.
-    builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("AppSettings"));
+    // Bind the "AppSettings" section from configuration to the AppSettings POCO class.
     var appSettings = builder.Configuration.GetSection("AppSettings").Get<AppSettings>()
-        ?? throw new InvalidOperationException("Could not bind AppSettings from configuration.");
+        ?? throw new InvalidOperationException("AppSettings is missing or invalid. Check your configuration.");
+
+    // Register the AppSettings instance as a singleton for dependency injection.
     builder.Services.AddSingleton(appSettings);
 
     // C. Database Contexts
     // Register the DbContext for Entity Framework Core.
     builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(
-        appSettings.ConnenctionStrings.SqlDbLocal,
-        sqlOptions => sqlOptions.EnableRetryOnFailure(
-            maxRetryCount: 5,
-            maxRetryDelay: TimeSpan.FromSeconds(10),
-            errorNumbersToAdd: null)
-    ).EnableSensitiveDataLogging()
-        .EnableDetailedErrors()
-        .LogTo(Console.WriteLine, LogLevel.Debug));
+        options.UseSqlServer(
+            appSettings.ConnectionStrings.SqlDbRemote,
+            sqlOptions => sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(10),
+                errorNumbersToAdd: null)
+        ).EnableSensitiveDataLogging()
+         .EnableDetailedErrors()
+         .LogTo(Console.WriteLine, LogLevel.Debug));
 
     // D. Application Services
     // Register application-specific services for dependency injection.
@@ -80,24 +106,10 @@ try
     builder.Services.AddScoped<IFileStorageService, LocalStorageService>();
     builder.Services.AddScoped<ICurrentUserProvider, CurrentUserProvider>();
 
-    if (builder.Environment.IsDevelopment())
-    {
-        // Use Mailtrap for local development and testing
-        var mailtrapSettings = appSettings.Mailtrap;
-        builder.Services.AddHttpClient<IEmailSender, MailtrapEmailSender>(client =>
-        {
-            client.BaseAddress = new Uri("https://sandbox.api.mailtrap.io/");
-            client.DefaultRequestHeaders.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Api-Token", mailtrapSettings.ApiKey);
-        });
-    }
-    else
-    {
-        // Use SendGrid for production
-        builder.Services.AddScoped<IEmailSender, SendGridEmailSender>();
-        builder.Services.AddSendGrid(options => options.ApiKey = appSettings.SendGrid.ApiKey);
-    }
-
+    // Configure SendGrid email service. The settings are bound from appsettings.json
+    // and can be overridden by environment-specific files or Key Vault.
+    builder.Services.AddScoped<IEmailSender, SendGridEmailSender>();
+    
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddAuthenticationCore();
 
@@ -260,31 +272,10 @@ try
     app.UseExceptionHandler();
 
     //// B. Security Headers (CSP, HSTS, etc.)
-    //app.UseSecurityHeaders(policy =>
-    //    policy.AddDefaultSecurityHeaders()
-    //          .AddStrictTransportSecurity(maxAgeInSeconds: 31536000, includeSubdomains: true, preload: false)
-    //          .AddContentSecurityPolicy(builder =>
-    //          {
-    //              builder.AddDefaultSrc().Self();
-    //              builder.AddStyleSrc()
-    //                  .Self()
-    //                  .WithHash("sha256", "efbUoiQm/B89WfPrCw5bS46IRtEEzIuQGeB2ScOtNrY=")
-    //                  .WithHash("sha256", "S/LcxN1zzSmlOmrB0jLtdk+Hf++yrpPaqh/zDyIP1n0=")
-    //                  .WithHash("sha256", "WOQJAfGFwlXJxngayYmMNTqx4exn6yDCYB91U+VuHjI=")
-    //                  .WithHash("sha256", "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="); // Added missing style hash
-    //              builder.AddScriptSrc()
-    //                  .Self()
-    //                  .WithHash("sha256", "88fCEs/foNf6+dc522ysL/kjlXW6d03HYxoC8/UPpQQ=")
-    //                  .WithHash("sha256", "oGikWC/2m6b6vzQGwFcwl9O+EaY3f2K95Acoaf8/Gyc=")
-    //                  .WithHash("sha256", "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=")
-    //                  .WithHash("sha256", "MVK6K6c1DHv9C+pvJqNgs6vELb5hkGblw90JjvBkYmQ=")
-    //                  .WithHash("sha256", "FPyEdp9GEPaFwIcUuWHYinwPMaAq8/sjLYLqi07vp40="); // Added missing script hash
-    //              var connectSrc = builder.AddConnectSrc().Self().Sources;
-    //              connectSrc.Add("ws://localhost:*");
-    //              connectSrc.Add("wss://localhost:*");
-    //              connectSrc.Add("http://localhost:*");
-    //              connectSrc.Add("https://localhost:*");
-    //          }));
+    app.UseSecurityHeaders(policy =>
+        policy.AddDefaultSecurityHeaders()
+              .AddStrictTransportSecurity(maxAgeInSeconds: 31536000, includeSubdomains: true, preload: false)
+              .AddContentSecurityPolicy(builder => builder.AddDefaultSrc().Self()));
 
     // C. CORS
     if (app.Environment.IsDevelopment())

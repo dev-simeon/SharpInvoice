@@ -4,7 +4,7 @@ using SharpInvoice.Modules.UserManagement.Application.Dtos;
 namespace SharpInvoice.API.Validators.UserManagement;
 
 /// <summary>
-/// Validator for the UpdateTeamMemberRoleRequest used when updating a team member's role.
+/// Validator for the UpdateTeamMemberRoleRequest, used when changing a team member's role.
 /// </summary>
 public class UpdateTeamMemberRoleRequestValidator : AbstractValidator<UpdateTeamMemberRoleRequest>
 {
@@ -14,6 +14,6 @@ public class UpdateTeamMemberRoleRequestValidator : AbstractValidator<UpdateTeam
     public UpdateTeamMemberRoleRequestValidator()
     {
         RuleFor(x => x.NewRoleId)
-            .NotEmpty().WithMessage("New role ID is required.");
+            .NotEmpty().WithMessage("A new role ID must be provided.");
     }
 } 

@@ -68,6 +68,13 @@ public sealed class User : Entity<Guid>
         PhoneNumber = phoneNumber;
     }
 
+    public string GenerateRefreshToken()
+    {
+        var refreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+        SetRefreshToken(refreshToken, DateTime.UtcNow.AddDays(7));
+        return refreshToken;
+    }
+
     public void SetRefreshToken(string token, DateTime expiry)
     {
         RefreshToken = token;

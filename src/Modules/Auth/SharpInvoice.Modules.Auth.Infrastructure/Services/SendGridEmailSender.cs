@@ -1,26 +1,51 @@
 namespace SharpInvoice.Modules.Auth.Infrastructure.Services;
 
-using Microsoft.Extensions.Options;
-using SendGrid;
-using SendGrid.Helpers.Mail;
+using Microsoft.Extensions.Logging;
 using SharpInvoice.Modules.Auth.Application.Interfaces;
 using SharpInvoice.Shared.Infrastructure.Configuration;
 using System.Net;
+using System.Net.Mail;
 
-public class SendGridEmailSender(IOptions<SendGridSettings> sendGridSettings) : IEmailSender
+public class SendGridEmailSender : IEmailSender
 {
+    private readonly SendGridSettings _settings;
+    private readonly ILogger<SendGridEmailSender> _logger;
+
+    public SendGridEmailSender(AppSettings appSettings, ILogger<SendGridEmailSender> logger)
+    {
+        _settings = appSettings.SendGrid;
+        _logger = logger;
+    }
+
     public async Task SendEmailAsync(string toEmail, string subject, string message)
     {
-        var client = new SendGridClient(sendGridSettings.Value.ApiKey);
-        var from = new EmailAddress(sendGridSettings.Value.FromEmail, sendGridSettings.Value.FromName);
-        var to = new EmailAddress(WebUtility.HtmlEncode(toEmail));
-        
-        // Sanitize subject to prevent header injection
-        var safeSubject = WebUtility.HtmlEncode(subject);
-        
-        // The message content is assumed to be HTML and should be already sanitized by EmailTemplateRenderer
-        var plainTextContent = message;
-        var msg = MailHelper.CreateSingleEmail(from, to, safeSubject, plainTextContent, message);
-        await client.SendEmailAsync(msg);
+        _logger.LogInformation("Sending email to {To} with subject '{Subject}' via SendGrid SMTP.", toEmail, subject);
+
+        try
+        {
+            using var smtpClient = new SmtpClient(_settings.SmtpHost, _settings.SmtpPort)
+            {
+                EnableSsl = true,
+                Credentials = new NetworkCredential(_settings.SmtpUsername, _settings.ApiKey)
+            };
+
+            using var mailMessage = new MailMessage
+            {
+                From = new MailAddress(_settings.FromEmail, _settings.FromName),
+                Subject = subject,
+                Body = message,
+                IsBodyHtml = true
+            };
+            
+            mailMessage.To.Add(toEmail);
+            
+            await smtpClient.SendMailAsync(mailMessage);
+            _logger.LogInformation("Successfully sent email via SMTP to {Recipient}", toEmail);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending email via SendGrid SMTP to {Recipient}", toEmail);
+            throw;
+        }
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace SharpInvoice.Modules.UserManagement.Infrastructure.Persistence.Configurations;
+namespace SharpInvoice.Modules.UserManagement.Infrastructure.Persistence.Configurations;
 
 using SharpInvoice.Modules.UserManagement.Domain.Entities;
 using Microsoft.EntityFrameworkCore;

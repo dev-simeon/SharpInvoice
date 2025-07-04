@@ -1,4 +1,4 @@
-﻿namespace SharpInvoice.Modules.UserManagement.Infrastructure.Services;
+namespace SharpInvoice.Modules.UserManagement.Infrastructure.Services;
 
 using SharpInvoice.Modules.UserManagement.Application.Interfaces;
 using SharpInvoice.Modules.UserManagement.Application.Dtos;

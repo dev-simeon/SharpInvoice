@@ -13,6 +13,8 @@ using System.Security.Claims;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
 using SharpInvoice.Shared.Infrastructure.Persistence;
+using Microsoft.Extensions.Options;
+using SharpInvoice.Shared.Infrastructure.Configuration;
 
 public class AuthService(
     AppDbContext context,
@@ -21,8 +23,11 @@ public class AuthService(
     IJwtTokenGenerator tokenGenerator,
     IEmailSender emailSender,
     IEmailTemplateRenderer templateRenderer,
-    IHttpContextAccessor httpContextAccessor) : IAuthService
+    IHttpContextAccessor httpContextAccessor,
+    AppSettings appSettings) : IAuthService
 {
+    private readonly string _appUrl = appSettings.AppUrl;
+
     public async Task<RegisterResponseDto> RegisterAndCreateBusinessAsync(RegisterUserCommand command)
     {
         if (await context.Users.AnyAsync(u => u.Email == command.Email))
@@ -33,7 +38,7 @@ public class AuthService(
 
         await businessService.CreateBusinessForUserAsync(user.Id, command.BusinessName, user.Email, command.Country);
 
-        var confirmationLink = $"https://yourapp.com/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(user.EmailConfirmationToken!)}";
+        var confirmationLink = $"{_appUrl}/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(user.EmailConfirmationToken!)}";
         var templateData = new Dictionary<string, string> { { "name", user.FirstName }, { "link", confirmationLink } };
         var emailBody = await templateRenderer.RenderAsync(EmailTemplate.EmailConfirmation, templateData);
         await emailSender.SendEmailAsync(user.Email, "Confirm Your SharpInvoice Account", emailBody);
@@ -70,7 +75,7 @@ public class AuthService(
         var roles = await teamMemberService.GetUserRolesAsync(user.Id, businessId);
         var permissions = Enumerable.Empty<string>();
 
-        var authResponse = await GenerateAndSaveTokens(user, businessId, roles, permissions);
+        var authResponse = await GenerateAndSaveTokens(user, businessId, roles, permissions, false);
         return new LoginResponseDto(false, AuthResponse: authResponse);
     }
 
@@ -81,6 +86,8 @@ public class AuthService(
             el => el.LoginProvider == info.LoginProvider && el.ProviderKey == info.ProviderKey);
 
         User? user;
+        bool isNewUser = false;
+        
         if (externalLogin != null)
         {
             user = await context.Users.FindAsync(externalLogin.UserId);
@@ -103,6 +110,7 @@ public class AuthService(
                 user = User.Create(email, firstName, lastName, ""); // No password for external logins
                 user.ConfirmEmail(); // Email is considered confirmed from external provider
                 context.Users.Add(user);
+                isNewUser = true;
             }
 
             var newExternalLogin = ExternalLogin.Create(user.Id, info.LoginProvider, info.ProviderKey);
@@ -117,20 +125,23 @@ public class AuthService(
 
         // Ensure business exists, create if not
         var businessId = await businessService.GetBusinessIdByOwnerAsync(user.Id);
-        if (businessId == Guid.Empty)
-        {
-            // The business name can't be known here. This is a design flaw in the flow.
-            // For now, let's create a default business name.
-            // This should be handled by redirecting the user to a "complete profile" page on the frontend.
-            var tempBusinessName = $"{user.FirstName}'s Business";
-            var createdBusiness = await businessService.CreateBusinessForUserAsync(user.Id, tempBusinessName, user.Email, "DefaultCountry");
-            businessId = createdBusiness.Id;
-        }
-
-        var roles = await teamMemberService.GetUserRolesAsync(user.Id, businessId);
+        var requiresProfileCompletion = businessId == Guid.Empty || isNewUser;
+        
+        // Generate tokens even if profile completion is needed
+        var roles = await teamMemberService.GetUserRolesAsync(user.Id, businessId == Guid.Empty ? Guid.Empty : businessId);
         var permissions = Enumerable.Empty<string>();
-
-        return await GenerateAndSaveTokens(user, businessId, roles, permissions);
+        
+        // Save the user and external login
+        await context.SaveChangesAsync();
+        
+        // Return the auth response with the profile completion flag
+        return await GenerateAndSaveTokens(
+            user, 
+            businessId == Guid.Empty ? Guid.Empty : businessId,
+            roles, 
+            permissions, 
+            requiresProfileCompletion
+        );
     }
 
     public async Task<bool> ResetPasswordAsync(ResetPasswordCommand command)
@@ -154,12 +165,15 @@ public class AuthService(
     {
         var user = await context.Users.SingleOrDefaultAsync(u => u.Email == command.Email);
         if (user == null) return;
+        
+        // Use secure random number generation
         var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+        
         var resetToken = PasswordResetToken.Create(token, user.Email, 15);
         await context.PasswordResetTokens.AddAsync(resetToken);
         await context.SaveChangesAsync();
 
-        var resetLink = $"https://sharpinvoice.com/reset-password?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(user.Email)}";
+        var resetLink = $"{_appUrl}/reset-password?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(user.Email)}";
         var templateData = new Dictionary<string, string>
             {
                 { "name", user.FirstName },
@@ -185,7 +199,7 @@ public class AuthService(
         var roles = await teamMemberService.GetUserRolesAsync(user.Id, businessId);
         var permissions = Enumerable.Empty<string>();
 
-        return await GenerateAndSaveTokens(user, businessId, roles, permissions);
+        return await GenerateAndSaveTokens(user, businessId, roles, permissions, false);
     }
 
     public AuthenticationProperties ConfigureExternalAuthenticationProperties(string provider, string redirectUrl)
@@ -208,7 +222,7 @@ public class AuthService(
         var permissions = Enumerable.Empty<string>();
 
         user.ClearTwoFactorCode();
-        return await GenerateAndSaveTokens(user, businessId, roles, permissions);
+        return await GenerateAndSaveTokens(user, businessId, roles, permissions, false);
     }
 
     public async Task<bool> ConfirmEmailAsync(Guid userId, string token)
@@ -265,12 +279,11 @@ public class AuthService(
         return new ExternalLoginInfo(principal, provider, providerKey, provider);
     }
 
-    private async Task<AuthResponseDto> GenerateAndSaveTokens(User user, Guid businessId, IEnumerable<string> roles, IEnumerable<string> permissions)
+    private async Task<AuthResponseDto> GenerateAndSaveTokens(User user, Guid businessId, IEnumerable<string> roles, IEnumerable<string> permissions, bool requiresProfileCompletion)
     {
         var token = tokenGenerator.GenerateToken(user, businessId, roles, permissions);
-        var refreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
-        user.SetRefreshToken(refreshToken, DateTime.UtcNow.AddDays(7));
+        var refreshToken = user.GenerateRefreshToken();
         await context.SaveChangesAsync();
-        return new AuthResponseDto(user.Id.ToString(), user.Email, token, refreshToken);
+        return new AuthResponseDto(user.Id.ToString(), user.Email, token, refreshToken, requiresProfileCompletion);
     }
 }

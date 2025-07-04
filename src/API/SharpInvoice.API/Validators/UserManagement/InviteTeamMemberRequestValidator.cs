@@ -4,7 +4,7 @@ using SharpInvoice.Modules.UserManagement.Application.Dtos;
 namespace SharpInvoice.API.Validators.UserManagement;
 
 /// <summary>
-/// Validator for the InviteTeamMemberRequest used when inviting a team member.
+/// Validator for the InviteTeamMemberRequest used when inviting a new team member.
 /// </summary>
 public class InviteTeamMemberRequestValidator : AbstractValidator<InviteTeamMemberRequest>
 {
@@ -14,10 +14,11 @@ public class InviteTeamMemberRequestValidator : AbstractValidator<InviteTeamMemb
     public InviteTeamMemberRequestValidator()
     {
         RuleFor(x => x.Email)
-            .NotEmpty().WithMessage("Email is required.")
-            .EmailAddress().WithMessage("A valid email address is required.");
+            .NotEmpty().WithMessage("Email address is required.")
+            .EmailAddress().WithMessage("A valid email address is required.")
+            .MaximumLength(256).WithMessage("Email address cannot exceed 256 characters.");
 
         RuleFor(x => x.RoleId)
-            .NotEmpty().WithMessage("Role ID is required.");
+            .NotEmpty().WithMessage("A role must be assigned to the invitation.");
     }
 } 
