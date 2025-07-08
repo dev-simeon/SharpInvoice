@@ -3,6 +3,7 @@
 using SharpInvoice.Modules.Auth.Domain.Entities;
 using SharpInvoice.Shared.Kernel.Domain;
 using SharpInvoice.Shared.Kernel.Exceptions;
+using SharpInvoice.Modules.UserManagement.Domain.Events;
 
 public sealed class TeamMember : AuditableEntity<Guid>
 {
@@ -13,22 +14,24 @@ public sealed class TeamMember : AuditableEntity<Guid>
     public Guid RoleId { get; private set; }
     public Role Role { get; } = null!;
 
-    internal TeamMember(Guid userId, Guid businessId, Guid roleId)
+    private TeamMember(Guid id, Guid userId, Guid businessId, Guid roleId) : base(id)
     {
-        UserId = userId; BusinessId = businessId; RoleId = roleId;
+        UserId = userId;
+        BusinessId = businessId;
+        RoleId = roleId;
     }
+
     public static TeamMember Create(Guid userId, Guid businessId, Guid roleId)
     {
         // Further validation could be added here if needed,
         // such as checking if the user is already a member of another business.
-        return new(userId, businessId, roleId);
+        var teamMember = new TeamMember(Guid.NewGuid(), userId, businessId, roleId);
+        teamMember.AddDomainEvent(new TeamMemberAddedDomainEvent(teamMember.Id));
+        return teamMember;
     }
-    
-    public void UpdateRole(Guid newRoleId, Guid businessOwnerId)
+
+    public void UpdateRole(Guid newRoleId)
     {
-        if (UserId == businessOwnerId)
-            throw new ForbidException("The business owner's role cannot be changed.");
-        
         RoleId = newRoleId;
     }
 

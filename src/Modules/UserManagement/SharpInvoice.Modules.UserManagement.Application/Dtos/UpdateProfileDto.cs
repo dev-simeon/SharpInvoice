@@ -11,15 +11,15 @@ using System.ComponentModel.DataAnnotations;
 /// <param name="AvatarUrl">The URL to the user's updated profile picture/avatar, if available.</param>
 /// <param name="PhoneNumber">The user's updated contact phone number, if available.</param>
 public record UpdateProfileDto(
-    [property: Required, MinLength(2), MaxLength(50), Description("The user's first name.")] 
+    [property: Required, MinLength(2), MaxLength(50), Description("The user's first name.")]
     string FirstName,
-    
-    [property: Required, MinLength(2), MaxLength(50), Description("The user's last name.")] 
+
+    [property: Required, MinLength(2), MaxLength(50), Description("The user's last name.")]
     string LastName,
-    
-    [property: Url, Description("The URL to the user's profile picture/avatar.")] 
+
+    [property: Url, Description("The URL to the user's profile picture/avatar.")]
     string? AvatarUrl,
-    
-    [property: Phone, Description("The user's contact phone number.")] 
+
+    [property: Phone, Description("The user's contact phone number.")]
     string? PhoneNumber
 );

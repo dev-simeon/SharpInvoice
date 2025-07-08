@@ -6,11 +6,13 @@ using Microsoft.AspNetCore.RateLimiting;
 using SharpInvoice.Modules.Auth.Application.Commands;
 using SharpInvoice.Modules.Auth.Application.Dtos;
 using SharpInvoice.Modules.Auth.Application.Interfaces;
-using SharpInvoice.Modules.UserManagement.Application.Interfaces;
+using SharpInvoice.Modules.Auth.Application.Queries;
 using System.Net.Mime;
-using System.Security.Claims;
 using Swashbuckle.AspNetCore.Filters;
 using SharpInvoice.API.Examples;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using MediatR;
 
 /// <summary>
 /// Provides endpoints for user authentication including registration, login, reset password, and token refresh.
@@ -19,29 +21,30 @@ using SharpInvoice.API.Examples;
 [Tags("Authentication")]
 [Route("api/auth")]
 [Produces(MediaTypeNames.Application.Json)]
-[AllowAnonymous]
-public class AuthController(IAuthService authService) : ControllerBase
+[EnableRateLimiting("auth")]
+public class AuthController(IMediator mediator) : ControllerBase
 {
     /// <summary>
     /// Registers a new user.
     /// </summary>
     /// <remarks>
-    /// This endpoint creates a new user, hashes their password, and sets up an initial business for them.
+    /// This endpoint creates a new user and hashes their password.
     /// It then sends a confirmation email to verify the user's email address.
+    /// After registration, the user should create a business.
     /// </remarks>
-    /// <param name="command">The registration details including email, password, and business information.</param>
-    /// <returns>Registration response with user information.</returns>
+    /// <param name="command">The registration details including email and password.</param>
+    /// <returns>A response containing the new user's ID.</returns>
     [HttpPost("register")]
+    [AllowAnonymous]
     [EndpointName("Register User")]
     [EndpointSummary("Register a new user account")]
     [EndpointDescription("Creates a new user account with the provided information and sends a confirmation email")]
-    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(AuthResponseDto))]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(RegisterResponseDto))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
     [SwaggerRequestExample(typeof(RegisterUserCommand), typeof(RegisterUserCommandExample))]
-    [SwaggerResponseExample(StatusCodes.Status201Created, typeof(RegisterResponseDtoExample))]
     public async Task<IActionResult> Register([FromBody] RegisterUserCommand command)
     {
-        var result = await authService.RegisterAndCreateBusinessAsync(command);
+        var result = await mediator.Send(command);
         return Created($"api/user/me", result);
     }
 
@@ -55,18 +58,18 @@ public class AuthController(IAuthService authService) : ControllerBase
     /// <param name="command">The login credentials including email and password.</param>
     /// <returns>Authentication response with tokens or 2FA challenge.</returns>
     [HttpPost("login")]
+    [AllowAnonymous]
     [EndpointName("User Login")]
     [EndpointSummary("Authenticate a user")]
     [EndpointDescription("Authenticates a user with credentials and returns JWT tokens or 2FA challenge")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(LoginResponseDto))]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AuthResponseDto))]
     [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(ProblemDetails))]
-    [EnableRateLimiting("login")]
     [SwaggerRequestExample(typeof(LoginUserCommand), typeof(LoginUserCommandExample))]
     [SwaggerResponseExample(StatusCodes.Status200OK, typeof(LoginResponseDtoExample))]
     public async Task<IActionResult> Login([FromBody] LoginUserCommand command)
     {
-        var result = await authService.LoginAsync(command);
+        var result = await mediator.Send(command);
         if (result.IsTwoFactorRequired)
         {
             return Ok(new { result.IsTwoFactorRequired, result.Message });
@@ -83,17 +86,17 @@ public class AuthController(IAuthService authService) : ControllerBase
     /// <param name="request">The verification details including email and 2FA code.</param>
     /// <returns>Authentication response with tokens.</returns>
     [HttpPost("login/verify-two-factor")]
+    [AllowAnonymous]
     [EndpointName("Verify Two-Factor Authentication")]
     [EndpointSummary("Complete login with 2FA verification")]
     [EndpointDescription("Verifies the two-factor authentication code to complete the login process")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AuthResponseDto))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
-    [EnableRateLimiting("login")]
     [SwaggerRequestExample(typeof(VerifyTwoFactorCommand), typeof(VerifyTwoFactorCommandExample))]
     [SwaggerResponseExample(StatusCodes.Status200OK, typeof(AuthResponseDtoExample))]
     public async Task<IActionResult> VerifyTwoFactor([FromBody] VerifyTwoFactorCommand request)
     {
-        var result = await authService.VerifyTwoFactorCodeAsync(request);
+        var result = await mediator.Send(request);
         return Ok(result);
     }
 
@@ -103,19 +106,20 @@ public class AuthController(IAuthService authService) : ControllerBase
     /// <remarks>
     /// Uses a valid refresh token to generate a new JWT access token without requiring user credentials.
     /// </remarks>
-    /// <param name="request">The refresh token details.</param>
+    /// <param name="command">The refresh token details.</param>
     /// <returns>Authentication response with new tokens.</returns>
     [HttpPost("refresh-token")]
+    [AllowAnonymous]
     [EndpointName("Refresh Authentication Token")]
     [EndpointSummary("Refresh an expired JWT token")]
     [EndpointDescription("Uses a valid refresh token to generate a new JWT access token")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AuthResponseDto))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
-    [SwaggerRequestExample(typeof(RefreshTokenRequest), typeof(RefreshTokenRequestExample))]
+    [SwaggerRequestExample(typeof(RefreshTokenCommand), typeof(RefreshTokenRequestExample))]
     [SwaggerResponseExample(StatusCodes.Status200OK, typeof(AuthResponseDtoExample))]
-    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenCommand command)
     {
-        var result = await authService.RefreshTokenAsync(request.RefreshToken);
+        var result = await mediator.Send(command);
         return Ok(result);
     }
 
@@ -129,6 +133,7 @@ public class AuthController(IAuthService authService) : ControllerBase
     /// <param name="token">The email confirmation token sent to the user's email.</param>
     /// <returns>Confirmation success message.</returns>
     [HttpGet("confirm-email")]
+    [AllowAnonymous]
     [EndpointName("Confirm User Email")]
     [EndpointSummary("Confirm a user's email address")]
     [EndpointDescription("Validates an email confirmation token to verify a user's email address")]
@@ -136,7 +141,8 @@ public class AuthController(IAuthService authService) : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
     public async Task<IActionResult> ConfirmEmail([FromQuery] Guid userId, [FromQuery] string token)
     {
-        var success = await authService.ConfirmEmailAsync(userId, token);
+        var command = new ConfirmEmailCommand(userId, token);
+        var success = await mediator.Send(command);
         if (!success) return BadRequest(new { Message = "Invalid email confirmation link." });
         return Ok(new { Message = "Email confirmed successfully." });
     }
@@ -148,6 +154,7 @@ public class AuthController(IAuthService authService) : ControllerBase
     /// <param name="returnUrl">Optional. The URL to return to after successful authentication.</param>
     /// <returns>A challenge result that redirects to the external provider.</returns>
     [HttpGet("external-login")]
+    [AllowAnonymous]
     [EndpointName("Initiate External Login")]
     [EndpointSummary("Start external authentication process")]
     [EndpointDescription("Redirects to an external authentication provider for login")]
@@ -156,7 +163,7 @@ public class AuthController(IAuthService authService) : ControllerBase
     {
         var redirectUrl = Url.Action(nameof(ExternalCallback), new { returnUrl })
             ?? throw new InvalidOperationException("Could not generate the external login callback URL.");
-        var properties = authService.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
+        var properties = ConfigureExternalAuthenticationProperties(provider, redirectUrl);
         return Challenge(properties, provider);
     }
 
@@ -171,6 +178,7 @@ public class AuthController(IAuthService authService) : ControllerBase
     /// <param name="remoteError">Optional. Error message from the external provider, if any.</param>
     /// <returns>Authentication response with tokens or error details.</returns>
     [HttpGet("external-callback")]
+    [AllowAnonymous]
     [EndpointName("External Login Callback")]
     [EndpointSummary("Complete external authentication")]
     [EndpointDescription("Processes the callback from external authentication provider")]
@@ -185,7 +193,7 @@ public class AuthController(IAuthService authService) : ControllerBase
             return BadRequest(new { Message = $"Error from external provider: {remoteError}" });
         }
 
-        var result = await authService.HandleExternalLoginAsync();
+        var result = await mediator.Send(new HandleExternalLoginCommand());
 
         // Here you would typically redirect to the frontend with the tokens
         // For an API, we can return the tokens directly.
@@ -202,15 +210,15 @@ public class AuthController(IAuthService authService) : ControllerBase
     /// <param name="command">The command containing the user's email.</param>
     /// <returns>A confirmation message.</returns>
     [HttpPost("forgot-password")]
+    [AllowAnonymous]
     [EndpointName("Forgot Password")]
     [EndpointSummary("Request password reset link")]
     [EndpointDescription("Sends a password reset link to the user's email address")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(object))]
-    [EnableRateLimiting("login")]
     [SwaggerRequestExample(typeof(ForgotPasswordCommand), typeof(ForgotPasswordCommandExample))]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordCommand command)
     {
-        await authService.ForgotPasswordAsync(command);
+        await mediator.Send(command);
         return Ok(new { Message = "If an account with this email exists, a password reset link has been sent." });
     }
 
@@ -223,17 +231,182 @@ public class AuthController(IAuthService authService) : ControllerBase
     /// <param name="command">The command containing the new password, email, and reset token.</param>
     /// <returns>A success message or a bad request if the token is invalid.</returns>
     [HttpPost("reset-password")]
+    [AllowAnonymous]
     [EndpointName("Reset Password")]
     [EndpointSummary("Reset user password")]
     [EndpointDescription("Changes a user's password using a valid reset token")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(object))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
-    [EnableRateLimiting("login")]
     [SwaggerRequestExample(typeof(ResetPasswordCommand), typeof(ResetPasswordCommandExample))]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordCommand command)
     {
-        var success = await authService.ResetPasswordAsync(command);
+        var success = await mediator.Send(command);
         if (!success) return BadRequest(new { Message = "Invalid token or email." });
         return Ok(new { Message = "Password has been reset successfully." });
+    }
+
+    /// <summary>
+    /// Logs out the user by revoking the refresh token
+    /// </summary>
+    /// <param name="command">The command containing the refresh token to revoke</param>
+    /// <returns>Success or failure status</returns>
+    [HttpPost("logout")]
+    [Authorize]
+    [EndpointName("Logout")]
+    [EndpointSummary("Logout user and revoke tokens")]
+    [EndpointDescription("Invalidates the refresh token to prevent further token refreshing")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+    [SwaggerRequestExample(typeof(RevokeTokenCommand), typeof(LogoutRequestExample))]
+    public async Task<IActionResult> Logout([FromBody] RevokeTokenCommand command)
+    {
+        if (string.IsNullOrEmpty(command.RefreshToken))
+        {
+            return BadRequest("Refresh token is required");
+        }
+
+        var result = await mediator.Send(command);
+        if (!result)
+        {
+            return BadRequest("Invalid token");
+        }
+
+        return Ok(new { message = "Successfully logged out" });
+    }
+
+    /// <summary>
+    /// Gets all external accounts linked to the user's account
+    /// </summary>
+    /// <returns>A collection of linked external accounts</returns>
+    [Authorize]
+    [HttpGet("linked-accounts")]
+    [EndpointName("Get Linked Accounts")]
+    [EndpointSummary("Get user's linked external accounts")]
+    [EndpointDescription("Returns a list of external identity providers linked to the user's account")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetLinkedAccounts()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var userIdGuid))
+        {
+            return Unauthorized();
+        }
+
+        var query = new GetLinkedAccountsQuery(userIdGuid);
+        var linkedAccounts = await mediator.Send(query);
+        return Ok(linkedAccounts);
+    }
+
+    /// <summary>
+    /// Links an external account to the user's account
+    /// </summary>
+    /// <param name="provider">The external provider (e.g. "Google", "Facebook")</param>
+    /// <param name="returnUrl">Optional URL to return to after linking</param>
+    /// <returns>Redirection to external provider</returns>
+    [Authorize]
+    [HttpGet("link-account")]
+    [EndpointName("Link External Account")]
+    [EndpointSummary("Link an external account")]
+    [EndpointDescription("Starts the flow to link an external identity provider to the user's account")]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    public IActionResult LinkAccount([FromQuery] string provider, [FromQuery] string? returnUrl = null)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        // Store the information that this is an account linking flow (not a login)
+        var redirectUrl = Url.Action(nameof(LinkAccountCallback), new { provider, returnUrl })
+            ?? throw new InvalidOperationException("Could not generate the link callback URL.");
+
+        var properties = ConfigureExternalAuthenticationProperties(provider, redirectUrl);
+        return Challenge(properties, provider);
+    }
+
+    /// <summary>
+    /// Processes the callback from external provider during account linking
+    /// </summary>
+    /// <param name="provider">The external provider being linked</param>
+    /// <param name="returnUrl">Optional URL to return to after linking</param>
+    /// <param name="remoteError">Error from the external provider, if any</param>
+    /// <returns>Result of the linking operation</returns>
+    [Authorize]
+    [HttpGet("link-account-callback")]
+    [EndpointName("Link Account Callback")]
+    [EndpointSummary("Complete account linking")]
+    [EndpointDescription("Processes the callback from external provider during account linking")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> LinkAccountCallback(
+        [FromQuery] string provider,
+        [FromQuery] string? returnUrl = null,
+        [FromQuery] string? remoteError = null)
+    {
+        if (remoteError != null)
+        {
+            return BadRequest(new { Message = $"Error from external provider: {remoteError}" });
+        }
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var userIdGuid))
+        {
+            return Unauthorized();
+        }
+
+        var info = await HttpContext.AuthenticateAsync("Identity.External");
+        if (info?.Principal == null)
+        {
+            return BadRequest(new { Message = "Could not retrieve external account information." });
+        }
+
+        var providerKey = info.Principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(providerKey))
+        {
+            return BadRequest(new { Message = "External provider did not provide a unique identifier." });
+        }
+
+        var command = new LinkAccountCommand(userIdGuid, provider, providerKey);
+        var success = await mediator.Send(command);
+
+        if (!success)
+        {
+            return BadRequest(new { Message = "This account is already linked to another user." });
+        }
+
+        return Ok(new { Message = $"Successfully linked your {provider} account." });
+    }
+
+    /// <summary>
+    /// Removes a linked external account from the user's account
+    /// </summary>
+    /// <param name="provider">The external provider to unlink</param>
+    /// <returns>Result of the unlinking operation</returns>
+    [Authorize]
+    [HttpPost("unlink-account")]
+    [EndpointName("Unlink External Account")]
+    [EndpointSummary("Unlink an external account")]
+    [EndpointDescription("Removes a link between the user's account and an external identity provider")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UnlinkAccount([FromQuery] string provider)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? throw new InvalidOperationException("User identifier not found."));
+
+        var command = new UnlinkAccountCommand(userId, provider);
+        await mediator.Send(command);
+
+        return Ok(new { Message = "Account unlinked successfully" });
+    }
+
+    private static AuthenticationProperties ConfigureExternalAuthenticationProperties(string provider, string redirectUrl)
+    {
+        var properties = new AuthenticationProperties { RedirectUri = redirectUrl };
+        properties.Items[".Challenge"] = "true";
+        properties.Items["LoginProvider"] = provider;
+        return properties;
     }
 }

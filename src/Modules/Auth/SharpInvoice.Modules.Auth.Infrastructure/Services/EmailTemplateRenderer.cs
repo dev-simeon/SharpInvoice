@@ -1,6 +1,6 @@
 namespace SharpInvoice.Modules.Auth.Infrastructure.Services;
 
-using SharpInvoice.Modules.Auth.Application.Interfaces;
+using SharpInvoice.Shared.Infrastructure.Interfaces;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -15,6 +15,9 @@ public class EmailTemplateRenderer : IEmailTemplateRenderer
         {
             EmailTemplate.EmailConfirmation => "EmailConfirmation.html",
             EmailTemplate.PasswordReset => "PasswordReset.html",
+            EmailTemplate.TwoFactorAuth => "TwoFactorAuth.html",
+            EmailTemplate.TeamInvitation => "TeamInvitation.html",
+            EmailTemplate.TeamMemberAdded => "TeamMemberAdded.html",
             _ => throw new KeyNotFoundException("The specified email template is not supported.")
         };
 
@@ -33,4 +36,4 @@ public class EmailTemplateRenderer : IEmailTemplateRenderer
 
         return templateContent;
     }
-} 
+}

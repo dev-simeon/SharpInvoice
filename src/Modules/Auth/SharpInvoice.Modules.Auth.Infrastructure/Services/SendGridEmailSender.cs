@@ -1,8 +1,8 @@
 namespace SharpInvoice.Modules.Auth.Infrastructure.Services;
 
 using Microsoft.Extensions.Logging;
-using SharpInvoice.Modules.Auth.Application.Interfaces;
 using SharpInvoice.Shared.Infrastructure.Configuration;
+using SharpInvoice.Shared.Infrastructure.Interfaces;
 using System.Net;
 using System.Net.Mail;
 
@@ -36,9 +36,9 @@ public class SendGridEmailSender : IEmailSender
                 Body = message,
                 IsBodyHtml = true
             };
-            
+
             mailMessage.To.Add(toEmail);
-            
+
             await smtpClient.SendMailAsync(mailMessage);
             _logger.LogInformation("Successfully sent email via SMTP to {Recipient}", toEmail);
         }

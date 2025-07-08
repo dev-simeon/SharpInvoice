@@ -1,23 +1,25 @@
 ﻿namespace SharpInvoice.API.Controllers;
 
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SharpInvoice.Modules.UserManagement.Application.Dtos;
-using SharpInvoice.Modules.UserManagement.Application.Interfaces;
-using SharpInvoice.Shared.Infrastructure.Interfaces;
-using System.Security.Claims;
-using Swashbuckle.AspNetCore.Filters;
 using SharpInvoice.API.Examples;
+using SharpInvoice.Modules.UserManagement.Application.Commands;
+using SharpInvoice.Modules.UserManagement.Application.Dtos;
+using SharpInvoice.Modules.UserManagement.Application.Queries;
+using Swashbuckle.AspNetCore.Filters;
+using System.Security.Claims;
 
 /// <summary>
 /// Provides endpoints for managing businesses.
 /// </summary>
 [ApiController]
-[Route("api/businesses")]
+[Route("api/business")]
 [Authorize]
 [Tags("Businesses")]
-public class BusinessController(IBusinessService businessService, ICurrentUserProvider currentUserProvider) : ControllerBase
+public class BusinessController(ISender sender) : ApiControllerBase
 {
+
     /// <summary>
     /// Checks if a business name is available in a specific country.
     /// </summary>
@@ -32,11 +34,9 @@ public class BusinessController(IBusinessService businessService, ICurrentUserPr
     [ProducesResponseType<bool>(StatusCodes.Status200OK)]
     public async Task<IActionResult> IsNameAvailable([FromQuery] string name, [FromQuery] string country)
     {
-        // This service method would need to be implemented
-        // var isAvailable = await businessService.IsNameAvailableAsync(name, country);
-        // return Ok(isAvailable);
-        await Task.CompletedTask; // Placeholder
-        return Ok(true);
+        var query = new IsBusinessNameAvailableQuery(name, country);
+        var isAvailable = await sender.Send(query);
+        return Ok(isAvailable);
     }
 
     /// <summary>
@@ -53,9 +53,9 @@ public class BusinessController(IBusinessService businessService, ICurrentUserPr
     [SwaggerResponseExample(StatusCodes.Status200OK, typeof(BusinessDetailsDtoExample))]
     public async Task<IActionResult> GetBusinessDetails()
     {
-        // You would get the businessId from the user's JWT claims
         var businessId = Guid.Parse(User.FindFirstValue("business_id")!);
-        var details = await businessService.GetBusinessDetailsAsync(businessId);
+        var query = new GetBusinessDetailsQuery(businessId);
+        var details = await sender.Send(query);
         return Ok(details);
     }
 
@@ -75,7 +75,8 @@ public class BusinessController(IBusinessService businessService, ICurrentUserPr
     public async Task<IActionResult> UpdateBusinessDetails([FromBody] UpdateBusinessDetailsDto dto)
     {
         var businessId = Guid.Parse(User.FindFirstValue("business_id")!);
-        await businessService.UpdateBusinessDetailsAsync(businessId, dto);
+        var command = new UpdateBusinessDetailsCommand(businessId, dto);
+        await sender.Send(command);
         return NoContent();
     }
 
@@ -95,8 +96,8 @@ public class BusinessController(IBusinessService businessService, ICurrentUserPr
     [SwaggerResponseExample(StatusCodes.Status201Created, typeof(BusinessDtoExample))]
     public async Task<IActionResult> CreateBusiness([FromBody] CreateBusinessRequest request)
     {
-        var userId = currentUserProvider.GetCurrentUserId();
-        var result = await businessService.CreateBusinessForUserAsync(userId, request.Name, request.Email, request.Country);
+        var command = new CreateBusinessCommand(request);
+        var result = await sender.Send(command);
         return CreatedAtAction(nameof(GetBusiness), new { businessId = result.Id }, result);
     }
 
@@ -115,7 +116,8 @@ public class BusinessController(IBusinessService businessService, ICurrentUserPr
     [SwaggerResponseExample(StatusCodes.Status200OK, typeof(BusinessDetailsDtoExample))]
     public async Task<IActionResult> GetBusiness([FromRoute] Guid businessId)
     {
-        var result = await businessService.GetBusinessDetailsAsync(businessId);
+        var query = new GetBusinessDetailsQuery(businessId);
+        var result = await sender.Send(query);
         return Ok(result);
     }
 
@@ -132,8 +134,8 @@ public class BusinessController(IBusinessService businessService, ICurrentUserPr
     [SwaggerResponseExample(StatusCodes.Status200OK, typeof(BusinessListExample))]
     public async Task<IActionResult> GetMyBusinesses()
     {
-        var userId = currentUserProvider.GetCurrentUserId();
-        var result = await businessService.GetBusinessesForUserAsync(userId);
+        var query = new GetMyBusinessesQuery();
+        var result = await sender.Send(query);
         return Ok(result);
     }
 
@@ -154,7 +156,8 @@ public class BusinessController(IBusinessService businessService, ICurrentUserPr
     [SwaggerRequestExample(typeof(UpdateBusinessDetailsDto), typeof(UpdateBusinessDetailsDtoExample))]
     public async Task<IActionResult> UpdateBusiness([FromRoute] Guid businessId, [FromBody] UpdateBusinessDetailsDto dto)
     {
-        await businessService.UpdateBusinessDetailsAsync(businessId, dto);
+        var command = new UpdateBusinessDetailsCommand(businessId, dto);
+        await sender.Send(command);
         return NoContent();
     }
 
@@ -180,7 +183,8 @@ public class BusinessController(IBusinessService businessService, ICurrentUserPr
             return BadRequest("No file uploaded.");
         }
 
-        await businessService.UpdateBusinessLogoAsync(businessId, logo.OpenReadStream(), logo.FileName);
+        var command = new UploadBusinessLogoCommand(businessId, logo.OpenReadStream(), logo.FileName);
+        await sender.Send(command);
         return NoContent();
     }
 
@@ -197,9 +201,11 @@ public class BusinessController(IBusinessService businessService, ICurrentUserPr
     [ProducesResponseType(typeof(void), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [Authorize(Policy = "ManageBusiness")]
     public async Task<IActionResult> DeactivateBusiness([FromRoute] Guid businessId)
     {
-        await businessService.DeactivateBusinessAsync(businessId);
+        var command = new DeactivateBusinessCommand(businessId);
+        await sender.Send(command);
         return NoContent();
     }
 
@@ -216,9 +222,11 @@ public class BusinessController(IBusinessService businessService, ICurrentUserPr
     [ProducesResponseType(typeof(void), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [Authorize(Policy = "ManageBusiness")]
     public async Task<IActionResult> ActivateBusiness([FromRoute] Guid businessId)
     {
-        await businessService.ActivateBusinessAsync(businessId);
+        var command = new ActivateBusinessCommand(businessId);
+        await sender.Send(command);
         return NoContent();
     }
 }

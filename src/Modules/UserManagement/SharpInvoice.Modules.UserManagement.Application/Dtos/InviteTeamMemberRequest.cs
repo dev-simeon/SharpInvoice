@@ -11,4 +11,4 @@ using System.ComponentModel.DataAnnotations;
 public record InviteTeamMemberRequest(
     [property: Required, EmailAddress] string Email,
     [property: Required] Guid RoleId
-); 
+);

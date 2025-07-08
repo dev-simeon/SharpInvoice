@@ -36,4 +36,4 @@ internal sealed class BadRequestExceptionHandler(ILogger<BadRequestExceptionHand
 
         return true;
     }
-} 
+}

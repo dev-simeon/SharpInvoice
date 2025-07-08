@@ -26,7 +26,7 @@ public class JwtTokenGenerator(AppSettings appSettings) : IJwtTokenGenerator
         {
             claims.Add(new Claim(ClaimTypes.Role, role));
         }
-        
+
         foreach (var permission in permissions)
         {
             claims.Add(new Claim("permission", permission));
@@ -47,7 +47,4 @@ public class JwtTokenGenerator(AppSettings appSettings) : IJwtTokenGenerator
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
-    
-    public string GenerateToken(User user, Guid businessId, IEnumerable<string> roles)
-        => GenerateToken(user, businessId, roles, Enumerable.Empty<string>());
 }

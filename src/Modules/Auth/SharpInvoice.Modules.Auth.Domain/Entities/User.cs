@@ -3,8 +3,9 @@ namespace SharpInvoice.Modules.Auth.Domain.Entities;
 using SharpInvoice.Shared.Kernel.Domain;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Cryptography;
+using SharpInvoice.Modules.Auth.Domain.Events;
 
-public sealed class User : Entity<Guid>
+public sealed class User : AuditableEntity<Guid>
 {
     [Required]
     [EmailAddress]
@@ -53,6 +54,9 @@ public sealed class User : Entity<Guid>
         var user = new User(Guid.NewGuid(), email, firstName, lastName);
         user.SetPasswordHash(passwordHash);
         user.GenerateEmailConfirmationToken();
+
+        user.AddDomainEvent(new UserCreatedDomainEvent(user.Id));
+
         return user;
     }
 
@@ -75,6 +79,18 @@ public sealed class User : Entity<Guid>
         return refreshToken;
     }
 
+    public void RevokeRefreshToken()
+    {
+        RefreshToken = null;
+        RefreshTokenExpiryTime = null;
+    }
+
+    public void GeneratePasswordResetToken()
+    {
+        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        AddDomainEvent(new PasswordResetRequestedDomainEvent(Id, token));
+    }
+
     public void SetRefreshToken(string token, DateTime expiry)
     {
         RefreshToken = token;
@@ -94,6 +110,11 @@ public sealed class User : Entity<Guid>
         EmailConfirmationTokenExpiry = null;
     }
 
+    public void ResetPassword(string newPasswordHash)
+    {
+        PasswordHash = newPasswordHash;
+    }
+
     public void SetPasswordHash(string newPasswordHash) => PasswordHash = newPasswordHash;
 
     public void EnableTwoFactor() => TwoFactorEnabled = true;
@@ -109,6 +130,7 @@ public sealed class User : Entity<Guid>
         if (!TwoFactorEnabled) return;
         TwoFactorCode = RandomNumberGenerator.GetInt32(100000, 999999).ToString("D6");
         TwoFactorCodeExpiry = DateTime.UtcNow.AddMinutes(10);
+        AddDomainEvent(new TwoFactorAuthenticationRequiredDomainEvent(Id));
     }
 
     public void ClearTwoFactorCode()
@@ -117,5 +139,5 @@ public sealed class User : Entity<Guid>
         TwoFactorCodeExpiry = null;
     }
 
-    private User() { Email = string.Empty; FirstName = string.Empty; LastName = string.Empty; PasswordHash = string.Empty; } // EF Core
+    private User() { /* EF Core constructor */ }
 }

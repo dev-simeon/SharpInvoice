@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 public enum PaymentMethod { Stripe, BankTransfer, Cash }
-public sealed class Transaction : Entity<Guid>
+public sealed class Transaction : AuditableEntity<Guid>
 {
     [Required] public Guid InvoiceId { get; private init; }
     [Required][Column(TypeName = "decimal(18, 2)")] public decimal Amount { get; private init; }
@@ -14,11 +14,21 @@ public sealed class Transaction : Entity<Guid>
     [MaxLength(256)] public string? ExternalTransactionId { get; private init; }
     public string? Notes { get; private set; }
 
-    internal Transaction(Guid id, Guid invoiceId, decimal amount, DateTime date, PaymentMethod method, string? externalId) : base(id)
+    private Transaction(Guid id, Guid invoiceId, decimal amount, DateTime date, PaymentMethod method, string? externalId) : base(id)
     {
-        InvoiceId = invoiceId; Amount = amount; TransactionDate = date; PaymentMethod = method; ExternalTransactionId = externalId;
+        InvoiceId = invoiceId;
+        Amount = amount;
+        TransactionDate = date;
+        PaymentMethod = method;
+        ExternalTransactionId = externalId;
     }
-    public static Transaction Create(Guid invoiceId, decimal amount, DateTime date, PaymentMethod method, string? externalId) => new(Guid.NewGuid(), invoiceId, amount, date, method, externalId);
+
+    public static Transaction Create(Guid invoiceId, decimal amount, DateTime date, PaymentMethod method, string? externalId)
+    {
+        return new(Guid.NewGuid(), invoiceId, amount, date, method, externalId);
+    }
+
     public void AddNote(string note) => Notes = note;
+
     private Transaction() { } // EF Core
 }

@@ -20,4 +20,4 @@ public class LoginUserCommandValidator : AbstractValidator<LoginUserCommand>
         RuleFor(x => x.Password)
             .NotEmpty().WithMessage("Password is required.");
     }
-} 
+}

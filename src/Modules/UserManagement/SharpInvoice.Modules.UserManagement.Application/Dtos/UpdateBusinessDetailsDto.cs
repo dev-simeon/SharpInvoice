@@ -28,4 +28,4 @@ public record UpdateBusinessDetailsDto(
     string? Country,
     [property: Url] string? LogoUrl,
     object? ThemeSettings
-); 
+);

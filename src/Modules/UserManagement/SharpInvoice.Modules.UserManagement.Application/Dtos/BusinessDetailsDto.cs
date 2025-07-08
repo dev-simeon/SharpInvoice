@@ -28,4 +28,4 @@ public record BusinessDetailsDto(
     string? Country,
     string? LogoUrl,
     bool IsActive
-); 
+);

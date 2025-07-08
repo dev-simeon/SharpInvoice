@@ -20,9 +20,7 @@ namespace SharpInvoice.API.Examples
                 Email: "john.doe@example.com",
                 FirstName: "John",
                 LastName: "Doe",
-                Password: "StrongP@ssw0rd!",
-                BusinessName: "Doe Enterprises",
-                Country: "US"
+                Password: "StrongP@ssw0rd!"
             );
         }
     }
@@ -168,6 +166,23 @@ namespace SharpInvoice.API.Examples
             return new RegisterResponseDto(
                 UserId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
                 Message: "Registration successful. Please check your email to confirm your account."
+            );
+        }
+    }
+
+    /// <summary>
+    /// Provides example data for LogoutRequest in Swagger documentation.
+    /// </summary>
+    public class LogoutRequestExample : IExamplesProvider<LogoutRequest>
+    {
+        /// <summary>
+        /// Gets example instance of LogoutRequest.
+        /// </summary>
+        /// <returns>Sample LogoutRequest data.</returns>
+        public LogoutRequest GetExamples()
+        {
+            return new LogoutRequest(
+                RefreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiZXhhbXBsZSIsInN1YiI6IjEyMzQ1Njc4OTAifQ.eBPN8pdcxWJ8hLiyvFgZgSZGv3EsH9iQ6J5so8L4Lac"
             );
         }
     }

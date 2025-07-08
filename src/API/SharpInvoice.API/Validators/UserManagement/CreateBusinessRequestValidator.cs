@@ -27,4 +27,4 @@ public class CreateBusinessRequestValidator : AbstractValidator<CreateBusinessRe
             .Length(2).WithMessage("Country must be a 2-letter ISO country code.")
             .Matches("^[A-Z]{2}$").WithMessage("Country code must be 2 uppercase letters (e.g., US, GB).");
     }
-} 
+}

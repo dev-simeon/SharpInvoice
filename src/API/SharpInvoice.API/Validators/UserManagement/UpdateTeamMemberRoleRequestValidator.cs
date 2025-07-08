@@ -16,4 +16,4 @@ public class UpdateTeamMemberRoleRequestValidator : AbstractValidator<UpdateTeam
         RuleFor(x => x.NewRoleId)
             .NotEmpty().WithMessage("A new role ID must be provided.");
     }
-} 
+}

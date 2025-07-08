@@ -20,4 +20,4 @@ public record TeamMemberDto(
     Guid RoleId,
     string RoleName,
     DateTime JoinedAt
-); 
+);

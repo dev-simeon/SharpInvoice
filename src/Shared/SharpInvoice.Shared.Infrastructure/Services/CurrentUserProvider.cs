@@ -42,4 +42,4 @@ public class CurrentUserProvider(IHttpContextAccessor httpContextAccessor) : ICu
         var businessId = httpContextAccessor.HttpContext?.User?.FindFirstValue("business_id");
         return Guid.TryParse(businessId, out var id) ? id : Guid.Empty;
     }
-} 
+}

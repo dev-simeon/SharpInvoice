@@ -1,12 +1,13 @@
 namespace SharpInvoice.API.Controllers;
 
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SharpInvoice.Modules.UserManagement.Application.Interfaces;
-using SharpInvoice.Modules.UserManagement.Application.Dtos;
-using SharpInvoice.Shared.Infrastructure.Interfaces;
-using Swashbuckle.AspNetCore.Filters;
 using SharpInvoice.API.Examples;
+using SharpInvoice.Modules.UserManagement.Application.Commands;
+using SharpInvoice.Modules.UserManagement.Application.Dtos;
+using SharpInvoice.Modules.UserManagement.Application.Queries;
+using Swashbuckle.AspNetCore.Filters;
 
 /// <summary>
 /// Provides endpoints for managing the authenticated user's profile.
@@ -16,8 +17,9 @@ using SharpInvoice.API.Examples;
 [Authorize]
 [Tags("User Profile")]
 [Produces("application/json")]
-public class UserController(IProfileService profileService, ICurrentUserProvider currentUserProvider) : ControllerBase
+public class UserController(ISender sender) : ApiControllerBase
 {
+
     /// <summary>
     /// Gets the profile of the currently authenticated user.
     /// </summary>
@@ -32,8 +34,8 @@ public class UserController(IProfileService profileService, ICurrentUserProvider
     [SwaggerResponseExample(StatusCodes.Status200OK, typeof(ProfileDtoExample))]
     public async Task<IActionResult> GetMyProfile()
     {
-        var userId = currentUserProvider.GetCurrentUserId();
-        var user = await profileService.GetProfileAsync(userId);
+        var query = new GetMyProfileQuery();
+        var user = await sender.Send(query);
         return Ok(user);
     }
 
@@ -52,8 +54,8 @@ public class UserController(IProfileService profileService, ICurrentUserProvider
     [SwaggerRequestExample(typeof(UpdateProfileDto), typeof(UpdateProfileDtoExample))]
     public async Task<IActionResult> UpdateMyProfile([FromBody] UpdateProfileDto dto)
     {
-        var userId = currentUserProvider.GetCurrentUserId();
-        await profileService.UpdateProfileAsync(userId, dto);
+        var command = new UpdateMyProfileCommand(dto);
+        await sender.Send(command);
         return NoContent();
     }
-} 
+}

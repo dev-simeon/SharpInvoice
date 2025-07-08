@@ -34,14 +34,5 @@ public class RegisterUserCommandValidator : AbstractValidator<RegisterUserComman
             .Matches("[a-z]").WithMessage("Password must contain at least one lowercase letter.")
             .Matches("[0-9]").WithMessage("Password must contain at least one number.")
             .Matches("[^a-zA-Z0-9]").WithMessage("Password must contain at least one special character.");
-
-        RuleFor(x => x.BusinessName)
-            .NotEmpty().WithMessage("Business name is required.")
-            .MinimumLength(2).WithMessage("Business name must be at least 2 characters long.")
-            .MaximumLength(100).WithMessage("Business name must not exceed 100 characters.");
-
-        RuleFor(x => x.Country)
-            .NotEmpty().WithMessage("Country is required.")
-            .Length(2).WithMessage("Country must be a 2-letter ISO country code.");
     }
-} 
+}

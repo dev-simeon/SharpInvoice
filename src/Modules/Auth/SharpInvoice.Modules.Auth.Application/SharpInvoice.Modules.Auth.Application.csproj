@@ -7,10 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\Shared\SharpInvoice.Shared.Infrastructure\SharpInvoice.Shared.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\UserManagement\SharpInvoice.Modules.UserManagement.Application\SharpInvoice.Modules.UserManagement.Application.csproj" />
 	<ProjectReference Include="..\SharpInvoice.Modules.Auth.Domain\SharpInvoice.Modules.Auth.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.4.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Abstractions" Version="2.3.0" />
   </ItemGroup>
 

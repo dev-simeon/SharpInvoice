@@ -4,7 +4,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -15,8 +14,10 @@ using Serilog;
 using SharpInvoice.API.ErrorHandling;
 using SharpInvoice.Modules.Auth.Application.Interfaces;
 using SharpInvoice.Modules.Auth.Infrastructure.Services;
+using SharpInvoice.Modules.Auth.Infrastructure.Repositories;
 using SharpInvoice.Modules.UserManagement.Application.Interfaces;
 using SharpInvoice.Modules.UserManagement.Infrastructure.Services;
+using SharpInvoice.Modules.UserManagement.Infrastructure.Repositories;
 using SharpInvoice.Shared.Infrastructure.Configuration;
 using SharpInvoice.Shared.Infrastructure.Interfaces;
 using SharpInvoice.Shared.Infrastructure.Persistence;
@@ -24,11 +25,17 @@ using SharpInvoice.Shared.Infrastructure.Services;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using System.Text;
-using System.Threading.RateLimiting;
 using Swashbuckle.AspNetCore.Filters;
 using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
+using SharpInvoice.Modules.Auth.Application.Commands;
+using Microsoft.AspNetCore.Authorization;
+using SharpInvoice.API.Authorization;
+using MediatR;
+using SharpInvoice.API.Behaviors;
 
 // --- 1. BOOTSTRAP SERILOG ---
 // Configure a logger for application startup. This is separate from the main
@@ -58,7 +65,7 @@ try
         {
             Log.Fatal(ex, "Failed to connect to Azure Key Vault. Please check the endpoint and credentials.");
             // We might want to throw here to prevent the app from starting with missing secrets.
-            throw; 
+            throw;
         }
     }
     else
@@ -97,24 +104,45 @@ try
 
     // D. Application Services
     // Register application-specific services for dependency injection.
+    builder.Services.AddScoped<IUserRepository, UserRepository>();
+    builder.Services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
+    builder.Services.AddScoped<IExternalLoginRepository, ExternalLoginRepository>();
+    builder.Services.AddScoped<IPasswordService, PasswordService>();
+    builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
     builder.Services.AddScoped<IAuthService, AuthService>();
+
     builder.Services.AddScoped<IBusinessService, BusinessService>();
     builder.Services.AddScoped<ITeamMemberService, TeamMemberService>();
     builder.Services.AddScoped<IProfileService, ProfileService>();
+    builder.Services.AddScoped<IRoleRepository, RoleRepository>();
+    builder.Services.AddScoped<IPermissionRepository, PermissionRepository>();
+    builder.Services.AddScoped<IInvitationRepository, InvitationRepository>();
+    builder.Services.AddScoped<ITeamMemberRepository, TeamMemberRepository>();
     builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
     builder.Services.AddScoped<IEmailTemplateRenderer, EmailTemplateRenderer>();
     builder.Services.AddScoped<IFileStorageService, LocalStorageService>();
     builder.Services.AddScoped<ICurrentUserProvider, CurrentUserProvider>();
 
+    // Add the background service to clean up expired refresh tokens
+    builder.Services.AddHostedService<RefreshTokenCleanupService>();
+
+    // Register MediatR and scan the Application assembly for handlers
+    builder.Services.AddMediatR(cfg =>
+    {
+        cfg.RegisterServicesFromAssemblyContaining<RegisterUserCommand>();
+        cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+    });
+
     // Configure SendGrid email service. The settings are bound from appsettings.json
     // and can be overridden by environment-specific files or Key Vault.
     builder.Services.AddScoped<IEmailSender, SendGridEmailSender>();
-    
+
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddAuthenticationCore();
 
     // E. Error Handling
     // Register custom exception handlers. They are executed in the order they are registered.
+    builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
     builder.Services.AddExceptionHandler<ForbidExceptionHandler>();
     builder.Services.AddExceptionHandler<InvalidTokenExceptionHandler>();
     builder.Services.AddExceptionHandler<BadRequestExceptionHandler>();
@@ -122,7 +150,7 @@ try
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
     builder.Services.AddProblemDetails();
     builder.Services.AddSingleton<ProblemDetailsFactory, ValidationProblemDetailsFactory>();
-    
+
     // Configure validation behavior for automatic 400 responses
     builder.Services.Configure<ApiBehaviorOptions>(options =>
     {
@@ -135,26 +163,12 @@ try
                 context.ModelState,
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "One or more validation errors occurred.");
-                
+
             return new BadRequestObjectResult(problemDetails)
             {
                 ContentTypes = { "application/problem+json" }
             };
         };
-    });
-
-    // H. Rate Limiting
-    builder.Services.AddRateLimiter(options =>
-    {
-        options.AddFixedWindowLimiter("login", opt =>
-        {
-            opt.PermitLimit = 10;
-            opt.Window = TimeSpan.FromMinutes(1);
-            opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-            opt.QueueLimit = 2;
-        });
-
-        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     });
 
     // F. Authentication
@@ -188,13 +202,20 @@ try
     {
         options.ClientId = appSettings.Authentication.Google.ClientId;
         options.ClientSecret = appSettings.Authentication.Google.ClientSecret;
+    })
+    .AddFacebook(options =>
+    {
+        options.AppId = appSettings.Authentication.Facebook.AppId;
+        options.AppSecret = appSettings.Authentication.Facebook.AppSecret;
     });
-    // .AddFacebook(options =>
-    // {
-    //     options.AppId = appSettings.Authentication.Facebook.AppId;
-    //     options.AppSecret = appSettings.Authentication.Facebook.AppSecret;
-    // });
-    builder.Services.AddAuthorization();
+
+    builder.Services.AddSingleton<IAuthorizationHandler, PermissionHandler>();
+
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy("ManageBusiness", policy =>
+            policy.Requirements.Add(new PermissionRequirement("business:manage")));
+    });
 
     // G. Core ASP.NET Services
     // Add essential services for controllers, API exploration, and caching.
@@ -236,7 +257,7 @@ try
     });
 
     // Add Swagger examples
-    builder.Services.AddSwaggerGen(c => 
+    builder.Services.AddSwaggerGen(c =>
     {
         c.ExampleFilters();
     });
@@ -262,6 +283,63 @@ try
         });
     }
 
+    // Add rate limiting using Microsoft's official approach
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.AddFixedWindowLimiter("fixed", options =>
+        {
+            options.PermitLimit = 100;
+            options.Window = TimeSpan.FromMinutes(1);
+            options.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+            options.QueueLimit = 0;
+        });
+
+        options.AddPolicy("api", httpContext =>
+        {
+            return RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ??
+                             (httpContext.Request.Headers.TryGetValue("X-Forwarded-For", out Microsoft.Extensions.Primitives.StringValues value) ? value.ToString() : "unknown"),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    AutoReplenishment = true,
+                    PermitLimit = 60,
+                    Window = TimeSpan.FromMinutes(1)
+                });
+        });
+
+        options.AddPolicy("auth", httpContext =>
+        {
+            return RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ??
+                             (httpContext.Request.Headers.ContainsKey("X-Forwarded-For") ?
+                              httpContext.Request.Headers["X-Forwarded-For"].ToString() : "unknown"),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    AutoReplenishment = true,
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(5)
+                });
+        });
+
+        options.OnRejected = async (context, cancellationToken) =>
+        {
+            context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+
+            if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            {
+                await context.HttpContext.Response.WriteAsync(
+                    $"Too many requests. Please try again after {retryAfter.TotalSeconds} seconds.",
+                    cancellationToken);
+            }
+            else
+            {
+                await context.HttpContext.Response.WriteAsync(
+                    "Too many requests. Please try again later.",
+                    cancellationToken);
+            }
+        };
+    });
+
     // --- 3. BUILD THE APPLICATION ---
     var app = builder.Build();
 
@@ -271,11 +349,23 @@ try
     // A. Error Handling Middleware
     app.UseExceptionHandler();
 
-    //// B. Security Headers (CSP, HSTS, etc.)
-    app.UseSecurityHeaders(policy =>
-        policy.AddDefaultSecurityHeaders()
-              .AddStrictTransportSecurity(maxAgeInSeconds: 31536000, includeSubdomains: true, preload: false)
-              .AddContentSecurityPolicy(builder => builder.AddDefaultSrc().Self()));
+    // B. Security Headers
+    app.UseSecurityHeaders(policies => policies
+        .AddDefaultSecurityHeaders()
+        .AddStrictTransportSecurityMaxAgeIncludeSubDomains(maxAgeInSeconds: 63072000) // 2 years
+        .AddCustomHeader("Content-Security-Policy",
+            "default-src 'self'; " +
+            "style-src 'self' 'unsafe-inline'; " +
+            "script-src 'self'; " +
+            "img-src 'self' data:; " +
+            "font-src 'self'; " +
+            "connect-src 'self'")
+        .AddCustomHeader("X-Content-Type-Options", "nosniff")
+        .AddCustomHeader("Referrer-Policy", "strict-origin-when-cross-origin")
+        .AddCustomHeader("X-XSS-Protection", "1; mode=block")
+        .AddCustomHeader("X-Frame-Options", "DENY")
+        .RemoveServerHeader()
+    );
 
     // C. CORS
     if (app.Environment.IsDevelopment())
@@ -286,16 +376,16 @@ try
     // D. HTTPS redirection
     app.UseHttpsRedirection();
 
+    // Use rate limiting middleware early in the pipeline
+    app.UseRateLimiter();
+
     // E. Response Compression
     app.UseResponseCompression();
 
     // F. Logging
     app.UseSerilogRequestLogging();
 
-    // G. Rate Limiting
-    app.UseRateLimiter();
-
-    // H. Root path redirect
+    // G. Root path redirect
     app.Use(async (context, next) =>
     {
         if (context.Request.Path == "/")
@@ -306,11 +396,11 @@ try
         await next();
     });
 
-    // I. Authentication & Authorization
+    // H. Authentication & Authorization
     app.UseAuthentication();
     app.UseAuthorization();
 
-    // J. API Documentation Endpoints
+    // I. API Documentation Endpoints
     app.MapOpenApi("/api/{documentName}/openapi.json").CacheOutput();
     app.MapScalarApiReference("/scalar/v1", options =>
     {
@@ -319,7 +409,7 @@ try
         options.Theme = ScalarTheme.BluePlanet;
     });
 
-    // K. Controller Endpoints
+    // J. Controller Endpoints
     app.MapControllers();
 
     // --- 5. RUN THE APPLICATION ---

@@ -34,4 +34,4 @@ internal sealed class GlobalExceptionHandler(
 
         return true;
     }
-} 
+}

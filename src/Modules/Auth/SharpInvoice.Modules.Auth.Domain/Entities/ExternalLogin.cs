@@ -3,7 +3,7 @@
 using SharpInvoice.Shared.Kernel.Domain;
 using System.ComponentModel.DataAnnotations;
 
-public sealed class ExternalLogin : Entity<Guid>
+public sealed class ExternalLogin : AuditableEntity<Guid>
 {
     [Required] public Guid UserId { get; private init; }
     public User User { get; private init; } = null!;

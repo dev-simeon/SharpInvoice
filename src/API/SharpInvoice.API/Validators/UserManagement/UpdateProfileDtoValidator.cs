@@ -38,4 +38,4 @@ public class UpdateProfileDtoValidator : AbstractValidator<UpdateProfileDto>
             return true;
         return Uri.TryCreate(url, UriKind.Absolute, out _);
     }
-} 
+}

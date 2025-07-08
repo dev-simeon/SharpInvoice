@@ -36,4 +36,4 @@ internal sealed class InvalidTokenExceptionHandler(ILogger<InvalidTokenException
 
         return true;
     }
-} 
+}

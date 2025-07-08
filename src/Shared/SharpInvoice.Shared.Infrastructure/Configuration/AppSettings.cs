@@ -15,6 +15,8 @@ public class AppSettings
     public SendGridSettings SendGrid { get; set; } = new();
     /// <summary>Gets or sets the base URL of the application.</summary>
     public string AppUrl { get; set; } = "https://sharpinvoice.com";
+    /// <summary>Gets or sets the security settings for the application.</summary>
+    public SecuritySettings Security { get; set; } = new();
 }
 
 /// <summary>
@@ -59,4 +61,14 @@ public class FacebookAuthSettings
     public string AppId { get; set; } = string.Empty;
     /// <summary>Gets or sets the Facebook application secret.</summary>
     public string AppSecret { get; set; } = string.Empty;
-} 
+}
+
+/// <summary>
+/// Security settings for the application
+/// </summary>
+public class SecuritySettings
+{
+    public string PasswordPepper { get; set; } = string.Empty;
+    public int MaxFailedAccessAttempts { get; set; } = 5;
+    public int LockoutTimeInMinutes { get; set; } = 15;
+}

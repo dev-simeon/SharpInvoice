@@ -1,6 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.4.0" />
+    <ProjectReference Include="..\..\..\Shared\SharpInvoice.Shared.Infrastructure\SharpInvoice.Shared.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\Shared\SharpInvoice.Shared.Kernel\SharpInvoice.Shared.Kernel.csproj" />
     <ProjectReference Include="..\SharpInvoice.Modules.UserManagement.Domain\SharpInvoice.Modules.UserManagement.Domain.csproj" />
   </ItemGroup>
 

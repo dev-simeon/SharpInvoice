@@ -36,4 +36,4 @@ internal sealed class NotFoundExceptionHandler(ILogger<NotFoundExceptionHandler>
 
         return true;
     }
-} 
+}

@@ -137,4 +137,4 @@ public class ValidationProblemDetailsFactory(
         // Add the error occurrence time
         problemDetails.Extensions["timestamp"] = DateTime.UtcNow;
     }
-} 
+}

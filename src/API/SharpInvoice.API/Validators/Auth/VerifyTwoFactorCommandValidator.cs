@@ -21,4 +21,4 @@ public class VerifyTwoFactorCommandValidator : AbstractValidator<VerifyTwoFactor
             .NotEmpty().WithMessage("Verification code is required.")
             .Length(6).WithMessage("Verification code must be 6 digits.");
     }
-} 
+}

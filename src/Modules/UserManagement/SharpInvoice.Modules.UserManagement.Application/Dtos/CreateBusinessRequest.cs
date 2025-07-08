@@ -12,4 +12,4 @@ public record CreateBusinessRequest(
     [property: Required, MinLength(2), MaxLength(100)] string Name,
     [property: Required, EmailAddress] string Email,
     [property: Required, StringLength(2, MinimumLength = 2)] string Country
-); 
+);

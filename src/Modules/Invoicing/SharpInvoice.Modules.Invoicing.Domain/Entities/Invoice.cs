@@ -29,25 +29,32 @@ public sealed class Invoice : AuditableEntity<Guid>
     private readonly List<Transaction> _transactions = [];
     public IReadOnlyCollection<Transaction> Transactions => _transactions.AsReadOnly();
 
-    private Invoice(Guid id, Guid businessId, Guid clientId, string invoiceNumber, string currency, string creatorId) : base(id)
+    private Invoice(Guid id, Guid businessId, Guid clientId, string invoiceNumber, string currency) : base(id)
     {
-        BusinessId = businessId; ClientId = clientId; InvoiceNumber = invoiceNumber; Currency = currency;
-        Status = InvoiceStatus.Draft; IssueDate = DateTime.UtcNow; DueDate = DateTime.UtcNow.AddDays(30);
-        CreatedBy = creatorId; // Tracks the user who issued the invoice
+        BusinessId = businessId;
+        ClientId = clientId;
+        InvoiceNumber = invoiceNumber;
+        Currency = currency;
+        Status = InvoiceStatus.Draft;
+        IssueDate = DateTime.UtcNow;
+        DueDate = DateTime.UtcNow.AddDays(30);
     }
 
-    public static Invoice Create(Guid businessId, Guid clientId, string invoiceNumber, string currency, string creatorId, bool businessIsActive)
+    public static Invoice Create(Guid businessId, Guid clientId, string invoiceNumber, string currency, bool businessIsActive)
     {
         if (!businessIsActive)
         {
             throw new InvalidOperationException("Invoices cannot be added to an inactive business.");
         }
-        return new(Guid.NewGuid(), businessId, clientId, invoiceNumber, currency, creatorId);
+        return new(Guid.NewGuid(), businessId, clientId, invoiceNumber, currency);
     }
 
     public void UpdateDetails(DateTime issueDate, DateTime dueDate, string? notes, string? terms)
     {
-        IssueDate = issueDate; DueDate = dueDate; Notes = notes; Terms = terms;
+        IssueDate = issueDate;
+        DueDate = dueDate;
+        Notes = notes;
+        Terms = terms;
     }
 
     public void AddItem(string description, decimal quantity, decimal unitPrice, string? unit)

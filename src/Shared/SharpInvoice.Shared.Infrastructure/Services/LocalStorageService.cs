@@ -15,7 +15,7 @@ public class LocalStorageService(IWebHostEnvironment webHostEnvironment) : IFile
         // Sanitize inputs for security
         var safeFileName = SanitizeFileName(fileName);
         var safeContainerName = SanitizeDirectoryName(containerName);
-        
+
         var uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(safeFileName)}";
         var folderPath = Path.Combine(webHostEnvironment.WebRootPath, safeContainerName);
         var filePath = Path.Combine(folderPath, uniqueFileName);
@@ -32,7 +32,7 @@ public class LocalStorageService(IWebHostEnvironment webHostEnvironment) : IFile
 
         return $"/{safeContainerName}/{uniqueFileName}";
     }
-    
+
     /// <summary>
     /// Sanitizes a filename to prevent path traversal and other security issues.
     /// </summary>
@@ -40,18 +40,18 @@ public class LocalStorageService(IWebHostEnvironment webHostEnvironment) : IFile
     {
         if (string.IsNullOrWhiteSpace(fileName))
             return "file";
-            
+
         // Remove any path information to avoid directory traversal
         fileName = Path.GetFileName(fileName);
-        
+
         // Replace any characters that aren't alphanumeric, underscore, dash, or dot
         // This helps prevent command injection and other security issues
         fileName = Regex.Replace(fileName, @"[^\w\-\.]", "_");
-        
+
         // Ensure the filename is not empty after sanitization
         return string.IsNullOrWhiteSpace(fileName) ? "file" : fileName;
     }
-    
+
     /// <summary>
     /// Sanitizes a directory name to prevent path traversal.
     /// </summary>
@@ -59,12 +59,12 @@ public class LocalStorageService(IWebHostEnvironment webHostEnvironment) : IFile
     {
         if (string.IsNullOrWhiteSpace(directoryName))
             return "files";
-            
+
         // Replace any characters that aren't alphanumeric, underscore, or dash
         // This prevents directory traversal and other security issues
         directoryName = Regex.Replace(directoryName, @"[^\w\-]", "_");
-        
+
         // Ensure the directory name is not empty after sanitization
         return string.IsNullOrWhiteSpace(directoryName) ? "files" : directoryName;
     }
-} 
+}

@@ -7,13 +7,13 @@ public sealed class Role : AuditableEntity<Guid>
 {
     [Required]
     [MaxLength(100)]
-    public string Name { get; private init; }
+    public string Name { get; private set; }
 
-    [MaxLength(255)]
+    [MaxLength(500)]
     public string? Description { get; private set; }
 
-    private readonly List<RolePermission> _rolePermissions = [];
-    public IReadOnlyCollection<RolePermission> RolePermissions => _rolePermissions.AsReadOnly();
+    private readonly List<RolePermission> _permissions = new();
+    public IReadOnlyCollection<RolePermission> Permissions => _permissions.AsReadOnly();
 
     public ICollection<TeamMember> TeamMembers { get; private set; } = [];
 
@@ -25,17 +25,17 @@ public sealed class Role : AuditableEntity<Guid>
     public void UpdateDescription(string? description) => Description = description;
     public void AddPermission(Permission permission)
     {
-        if (!_rolePermissions.Any(rp => rp.PermissionId == permission.Id))
+        if (!_permissions.Any(rp => rp.PermissionId == permission.Id))
         {
-            _rolePermissions.Add(new RolePermission(Id, permission.Id));
+            _permissions.Add(new RolePermission(Id, permission.Id));
         }
     }
     public void RemovePermission(Permission permission)
     {
-        var rolePermission = _rolePermissions.FirstOrDefault(rp => rp.PermissionId == permission.Id);
+        var rolePermission = _permissions.FirstOrDefault(rp => rp.PermissionId == permission.Id);
         if (rolePermission != null)
         {
-            _rolePermissions.Remove(rolePermission);
+            _permissions.Remove(rolePermission);
         }
     }
     private Role() { Name = string.Empty; } // EF Core

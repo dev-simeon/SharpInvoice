@@ -21,4 +21,4 @@ public class InviteTeamMemberRequestValidator : AbstractValidator<InviteTeamMemb
         RuleFor(x => x.RoleId)
             .NotEmpty().WithMessage("A role must be assigned to the invitation.");
     }
-} 
+}

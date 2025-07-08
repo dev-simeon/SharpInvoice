@@ -30,4 +30,4 @@ public class ForbidExceptionHandler : IExceptionHandler
         await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
         return true;
     }
-} 
+}

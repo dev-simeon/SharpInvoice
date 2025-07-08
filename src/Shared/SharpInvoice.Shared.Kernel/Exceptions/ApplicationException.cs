@@ -1,5 +1,14 @@
 namespace SharpInvoice.Shared.Kernel.Exceptions;
- 
-public abstract class ApplicationException(string message) : Exception(message)
+
+using System;
+
+public abstract class ApplicationException : Exception
 {
-} 
+    protected ApplicationException(string message) : base(message)
+    {
+    }
+
+    protected ApplicationException(string message, Exception innerException) : base(message, innerException)
+    {
+    }
+}

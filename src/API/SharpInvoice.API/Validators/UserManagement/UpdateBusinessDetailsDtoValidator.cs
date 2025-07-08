@@ -39,4 +39,4 @@ public class UpdateBusinessDetailsDtoValidator : AbstractValidator<UpdateBusines
             return true;
         return Uri.TryCreate(url, UriKind.Absolute, out _);
     }
-} 
+}

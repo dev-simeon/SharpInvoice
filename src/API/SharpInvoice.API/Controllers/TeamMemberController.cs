@@ -1,24 +1,26 @@
 namespace SharpInvoice.API.Controllers;
 
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SharpInvoice.Modules.UserManagement.Application.Interfaces;
-using System;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using SharpInvoice.Modules.UserManagement.Application.Dtos;
-using Swashbuckle.AspNetCore.Filters;
 using SharpInvoice.API.Examples;
+using SharpInvoice.Modules.UserManagement.Application.Commands;
+using SharpInvoice.Modules.UserManagement.Application.Dtos;
+using SharpInvoice.Modules.UserManagement.Application.Queries;
+using Swashbuckle.AspNetCore.Filters;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 /// <summary>
 /// Provides endpoints for managing team members within a business.
 /// </summary>
 [ApiController]
-[Route("api/businesses/{businessId}/team")]
+[Route("api/team-members")]
 [Authorize]
 [Tags("Team Management")]
 [Produces("application/json")]
-public class TeamMemberController(ITeamMemberService teamMemberService) : ControllerBase
+public class TeamMemberController(ISender sender) : ApiControllerBase
 {
     /// <summary>
     /// Invites a new member to the business.
@@ -38,7 +40,8 @@ public class TeamMemberController(ITeamMemberService teamMemberService) : Contro
     [SwaggerRequestExample(typeof(InviteTeamMemberRequest), typeof(InviteTeamMemberRequestExample))]
     public async Task<IActionResult> InviteTeamMember([FromRoute] Guid businessId, [FromBody] InviteTeamMemberRequest request)
     {
-        await teamMemberService.InviteTeamMemberAsync(businessId, request.Email, request.RoleId);
+        var command = new InviteTeamMemberCommand(businessId, request.Email, request.RoleId);
+        await sender.Send(command);
         return Ok();
     }
 
@@ -56,7 +59,8 @@ public class TeamMemberController(ITeamMemberService teamMemberService) : Contro
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
     public async Task<IActionResult> AcceptInvitation([FromQuery] string token)
     {
-        await teamMemberService.AcceptInvitationAsync(token);
+        var command = new AcceptInvitationCommand(token);
+        await sender.Send(command);
         return Ok("Invitation accepted successfully.");
     }
 
@@ -75,7 +79,8 @@ public class TeamMemberController(ITeamMemberService teamMemberService) : Contro
     [SwaggerResponseExample(StatusCodes.Status200OK, typeof(TeamMemberListExample))]
     public async Task<IActionResult> GetTeamMembers([FromRoute] Guid businessId)
     {
-        var members = await teamMemberService.GetTeamMembersForBusinessAsync(businessId);
+        var query = new GetTeamMembersQuery(businessId);
+        var members = await sender.Send(query);
         return Ok(members);
     }
 
@@ -95,7 +100,8 @@ public class TeamMemberController(ITeamMemberService teamMemberService) : Contro
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
     public async Task<IActionResult> RemoveTeamMember([FromRoute] Guid businessId, [FromRoute] Guid teamMemberId)
     {
-        await teamMemberService.RemoveTeamMemberAsync(teamMemberId);
+        var command = new RemoveTeamMemberCommand(teamMemberId);
+        await sender.Send(command);
         return NoContent();
     }
 
@@ -117,7 +123,8 @@ public class TeamMemberController(ITeamMemberService teamMemberService) : Contro
     [SwaggerRequestExample(typeof(UpdateTeamMemberRoleRequest), typeof(UpdateTeamMemberRoleRequestExample))]
     public async Task<IActionResult> UpdateTeamMemberRole([FromRoute] Guid businessId, [FromRoute] Guid teamMemberId, [FromBody] UpdateTeamMemberRoleRequest request)
     {
-        await teamMemberService.UpdateTeamMemberRoleAsync(teamMemberId, request.NewRoleId);
+        var command = new UpdateTeamMemberRoleCommand(teamMemberId, request.NewRoleId);
+        await sender.Send(command);
         return NoContent();
     }
 }

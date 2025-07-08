@@ -1,11 +1,21 @@
 ﻿namespace SharpInvoice.Shared.Infrastructure.Persistence;
 
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using SharpInvoice.Modules.Auth.Domain.Entities;
 using SharpInvoice.Modules.Invoicing.Domain.Entities;
 using SharpInvoice.Modules.Payments.Domain.Entities;
 using SharpInvoice.Modules.UserManagement.Domain.Entities;
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+using SharpInvoice.Shared.Infrastructure.Interfaces;
+using SharpInvoice.Shared.Kernel.Domain;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+public class AppDbContext(
+    DbContextOptions<AppDbContext> options,
+    ICurrentUserProvider currentUserProvider,
+    IMediator mediator) : DbContext(options)
 {
     public DbSet<User> Users { get; set; }
     public DbSet<ExternalLogin> ExternalLogins { get; set; }
@@ -32,5 +42,48 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         }
 
         base.OnModelCreating(modelBuilder);
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        await DispatchDomainEventsAsync();
+
+        var currentUserId = currentUserProvider.GetCurrentUserId().ToString();
+        var now = DateTime.UtcNow;
+
+        foreach (var entry in ChangeTracker.Entries<AuditableEntity<Guid>>())
+        {
+            switch (entry.State)
+            {
+                case EntityState.Added:
+                    entry.Entity.CreatedAt = now;
+                    entry.Entity.CreatedBy = currentUserId;
+                    break;
+                case EntityState.Modified:
+                    entry.Entity.UpdatedAt = now;
+                    entry.Entity.UpdatedBy = currentUserId;
+                    break;
+            }
+        }
+
+        return await base.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task DispatchDomainEventsAsync()
+    {
+        var domainEventEntities = ChangeTracker.Entries<Entity<Guid>>()
+            .Select(e => e.Entity)
+            .Where(e => e.DomainEvents.Any())
+            .ToArray();
+
+        foreach (var entity in domainEventEntities)
+        {
+            var events = entity.DomainEvents.ToArray();
+            entity.ClearDomainEvents();
+            foreach (var domainEvent in events)
+            {
+                await mediator.Publish(domainEvent);
+            }
+        }
     }
 }

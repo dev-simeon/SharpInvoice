@@ -4,6 +4,7 @@ using SharpInvoice.Shared.Kernel.Domain;
 using System.ComponentModel.DataAnnotations;
 using SharpInvoice.Shared.Kernel.Exceptions;
 using System.Security.Cryptography;
+using SharpInvoice.Modules.UserManagement.Domain.Events;
 
 public enum InvitationStatus { Pending, Accepted, Expired }
 public sealed class Invitation : Entity<Guid>
@@ -19,9 +20,14 @@ public sealed class Invitation : Entity<Guid>
 
     private Invitation(Guid id, Guid businessId, string email, Guid roleId, string token, DateTime expiry) : base(id)
     {
-        BusinessId = businessId; InvitedUserEmail = email; RoleId = roleId; Token = token; ExpiryDate = expiry; Status = InvitationStatus.Pending;
+        BusinessId = businessId;
+        InvitedUserEmail = email;
+        RoleId = roleId;
+        Token = token;
+        ExpiryDate = expiry;
+        Status = InvitationStatus.Pending;
     }
-    
+
     public static Invitation Create(Guid businessId, string email, Guid roleId, int validityInHours, ICollection<TeamMember> existingMembers)
     {
         if (string.IsNullOrWhiteSpace(email))
@@ -32,26 +38,28 @@ public sealed class Invitation : Entity<Guid>
 
         var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var expiry = DateTime.UtcNow.AddHours(validityInHours);
-        
-        return new(Guid.NewGuid(), businessId, email, roleId, token, expiry);
+
+        var invitation = new Invitation(Guid.NewGuid(), businessId, email, roleId, token, expiry);
+        invitation.AddDomainEvent(new InvitationSentDomainEvent(invitation.Id));
+        return invitation;
     }
 
-    public void Accept() 
+    public void Accept()
     {
         if (Status != InvitationStatus.Pending)
             throw new InvalidOperationException("Only a pending invitation can be accepted.");
-        
+
         if (DateTime.UtcNow > ExpiryDate)
             throw new InvalidOperationException("This invitation has expired.");
 
         Status = InvitationStatus.Accepted;
     }
 
-    public void Expire() 
+    public void Expire()
     {
-        if (Status == InvitationStatus.Pending) 
+        if (Status == InvitationStatus.Pending)
             Status = InvitationStatus.Expired;
     }
-    
+
     private Invitation() { InvitedUserEmail = string.Empty; Token = string.Empty; Role = null!; Business = null!; } // EF Core
 }

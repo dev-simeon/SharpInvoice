@@ -2,11 +2,11 @@
 
 public abstract class AuditableEntity<TId> : Entity<TId> where TId : notnull
 {
-    public DateTime CreatedAt { get; set; }
-    public string? CreatedBy { get; set; } // Can be UserId or username
-    public DateTime? UpdatedAt { get; set; }
-    public string? UpdatedBy { get; set; }
-    public bool IsDeleted { get; set; }
+    public DateTime CreatedAt { get; internal set; }
+    public string? CreatedBy { get; internal set; } // Can be UserId or username
+    public DateTime? UpdatedAt { get; internal set; }
+    public string? UpdatedBy { get; internal set; }
+    public bool IsDeleted { get; internal set; }
 
     protected AuditableEntity(TId id) : base(id) { }
     protected AuditableEntity() { } // EF Core

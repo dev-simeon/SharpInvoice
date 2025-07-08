@@ -13,7 +13,7 @@ public class RoleConfiguration : IEntityTypeConfiguration<Role>
         builder.HasIndex(r => r.Name).IsUnique();
 
         // Configure the many-to-many relationship with Permission
-        builder.HasMany(r => r.RolePermissions)
+        builder.HasMany(r => r.Permissions)
             .WithOne(rp => rp.Role)
             .HasForeignKey(rp => rp.RoleId);
     }

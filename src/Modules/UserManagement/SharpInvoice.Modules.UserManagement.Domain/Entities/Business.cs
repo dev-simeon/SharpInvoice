@@ -54,7 +54,7 @@ public sealed class Business : AuditableEntity<Guid>
             throw new BadRequestException("Business name cannot be empty.");
         if (string.IsNullOrWhiteSpace(country))
             throw new BadRequestException("Country cannot be empty.");
-        
+
         return new(Guid.NewGuid(), name, ownerId, country);
     }
 
@@ -63,9 +63,9 @@ public sealed class Business : AuditableEntity<Guid>
         if (string.IsNullOrWhiteSpace(name))
             throw new BadRequestException("Business name cannot be empty.");
 
-        Name = name; 
-        Email = email; 
-        PhoneNumber = phone; 
+        Name = name;
+        Email = email;
+        PhoneNumber = phone;
         Website = website;
     }
 
@@ -74,7 +74,11 @@ public sealed class Business : AuditableEntity<Guid>
         if (string.IsNullOrWhiteSpace(country))
             throw new BadRequestException("Country cannot be empty.");
 
-        Address = address; City = city; State = state; ZipCode = zip; Country = country;
+        Address = address;
+        City = city;
+        State = state;
+        ZipCode = zip;
+        Country = country;
     }
 
     public void UpdateBranding(string? logoUrl, string themeSettingsJson)
@@ -88,7 +92,7 @@ public sealed class Business : AuditableEntity<Guid>
             throw new BadRequestException($"Theme settings must be a valid JSON string. Details: {ex.Message}");
         }
 
-        LogoUrl = logoUrl; 
+        LogoUrl = logoUrl;
         ThemeSettings = themeSettingsJson;
     }
 

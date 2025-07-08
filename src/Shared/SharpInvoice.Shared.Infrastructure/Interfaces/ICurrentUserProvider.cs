@@ -26,4 +26,4 @@ public interface ICurrentUserProvider
     /// </summary>
     /// <returns>The business ID from claims, or Guid.Empty if not found.</returns>
     Guid GetCurrentBusinessId();
-} 
+}
