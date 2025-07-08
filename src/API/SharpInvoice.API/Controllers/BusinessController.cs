@@ -1,12 +1,10 @@
 ﻿namespace SharpInvoice.API.Controllers;
 
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SharpInvoice.API.Examples;
-using SharpInvoice.Modules.UserManagement.Application.Commands;
 using SharpInvoice.Modules.UserManagement.Application.Dtos;
-using SharpInvoice.Modules.UserManagement.Application.Queries;
+using SharpInvoice.Modules.UserManagement.Application.Interfaces;
 using Swashbuckle.AspNetCore.Filters;
 using System.Security.Claims;
 
@@ -17,7 +15,7 @@ using System.Security.Claims;
 [Route("api/business")]
 [Authorize]
 [Tags("Businesses")]
-public class BusinessController(ISender sender) : ApiControllerBase
+public class BusinessController(IBusinessService businessService) : ApiControllerBase
 {
 
     /// <summary>
@@ -34,8 +32,7 @@ public class BusinessController(ISender sender) : ApiControllerBase
     [ProducesResponseType<bool>(StatusCodes.Status200OK)]
     public async Task<IActionResult> IsNameAvailable([FromQuery] string name, [FromQuery] string country)
     {
-        var query = new IsBusinessNameAvailableQuery(name, country);
-        var isAvailable = await sender.Send(query);
+        var isAvailable = await businessService.IsBusinessNameAvailableAsync(name, country);
         return Ok(isAvailable);
     }
 
@@ -54,8 +51,7 @@ public class BusinessController(ISender sender) : ApiControllerBase
     public async Task<IActionResult> GetBusinessDetails()
     {
         var businessId = Guid.Parse(User.FindFirstValue("business_id")!);
-        var query = new GetBusinessDetailsQuery(businessId);
-        var details = await sender.Send(query);
+        var details = await businessService.GetBusinessDetailsAsync(businessId);
         return Ok(details);
     }
 
@@ -75,8 +71,7 @@ public class BusinessController(ISender sender) : ApiControllerBase
     public async Task<IActionResult> UpdateBusinessDetails([FromBody] UpdateBusinessDetailsDto dto)
     {
         var businessId = Guid.Parse(User.FindFirstValue("business_id")!);
-        var command = new UpdateBusinessDetailsCommand(businessId, dto);
-        await sender.Send(command);
+        await businessService.UpdateBusinessDetailsAsync(businessId, dto);
         return NoContent();
     }
 
@@ -96,8 +91,7 @@ public class BusinessController(ISender sender) : ApiControllerBase
     [SwaggerResponseExample(StatusCodes.Status201Created, typeof(BusinessDtoExample))]
     public async Task<IActionResult> CreateBusiness([FromBody] CreateBusinessRequest request)
     {
-        var command = new CreateBusinessCommand(request);
-        var result = await sender.Send(command);
+        var result = await businessService.CreateBusinessAsync(request.Name, request.Email, request.Country);
         return CreatedAtAction(nameof(GetBusiness), new { businessId = result.Id }, result);
     }
 
@@ -116,8 +110,7 @@ public class BusinessController(ISender sender) : ApiControllerBase
     [SwaggerResponseExample(StatusCodes.Status200OK, typeof(BusinessDetailsDtoExample))]
     public async Task<IActionResult> GetBusiness([FromRoute] Guid businessId)
     {
-        var query = new GetBusinessDetailsQuery(businessId);
-        var result = await sender.Send(query);
+        var result = await businessService.GetBusinessDetailsAsync(businessId);
         return Ok(result);
     }
 
@@ -134,8 +127,7 @@ public class BusinessController(ISender sender) : ApiControllerBase
     [SwaggerResponseExample(StatusCodes.Status200OK, typeof(BusinessListExample))]
     public async Task<IActionResult> GetMyBusinesses()
     {
-        var query = new GetMyBusinessesQuery();
-        var result = await sender.Send(query);
+        var result = await businessService.GetMyBusinessesAsync();
         return Ok(result);
     }
 
@@ -156,8 +148,7 @@ public class BusinessController(ISender sender) : ApiControllerBase
     [SwaggerRequestExample(typeof(UpdateBusinessDetailsDto), typeof(UpdateBusinessDetailsDtoExample))]
     public async Task<IActionResult> UpdateBusiness([FromRoute] Guid businessId, [FromBody] UpdateBusinessDetailsDto dto)
     {
-        var command = new UpdateBusinessDetailsCommand(businessId, dto);
-        await sender.Send(command);
+        await businessService.UpdateBusinessDetailsAsync(businessId, dto);
         return NoContent();
     }
 
@@ -183,8 +174,7 @@ public class BusinessController(ISender sender) : ApiControllerBase
             return BadRequest("No file uploaded.");
         }
 
-        var command = new UploadBusinessLogoCommand(businessId, logo.OpenReadStream(), logo.FileName);
-        await sender.Send(command);
+        await businessService.UploadBusinessLogoAsync(businessId, logo.OpenReadStream(), logo.FileName);
         return NoContent();
     }
 
@@ -204,8 +194,7 @@ public class BusinessController(ISender sender) : ApiControllerBase
     [Authorize(Policy = "ManageBusiness")]
     public async Task<IActionResult> DeactivateBusiness([FromRoute] Guid businessId)
     {
-        var command = new DeactivateBusinessCommand(businessId);
-        await sender.Send(command);
+        await businessService.DeactivateBusinessAsync(businessId);
         return NoContent();
     }
 
@@ -225,8 +214,10 @@ public class BusinessController(ISender sender) : ApiControllerBase
     [Authorize(Policy = "ManageBusiness")]
     public async Task<IActionResult> ActivateBusiness([FromRoute] Guid businessId)
     {
-        var command = new ActivateBusinessCommand(businessId);
-        await sender.Send(command);
+        await businessService.ActivateBusinessAsync(businessId);
         return NoContent();
     }
 }
+
+// Request DTOs to replace MediatR commands
+public record CreateBusinessRequest(string Name, string Email, string Country);

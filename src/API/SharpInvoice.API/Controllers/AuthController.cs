@@ -3,16 +3,13 @@ namespace SharpInvoice.API.Controllers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using SharpInvoice.Modules.Auth.Application.Commands;
 using SharpInvoice.Modules.Auth.Application.Dtos;
 using SharpInvoice.Modules.Auth.Application.Interfaces;
-using SharpInvoice.Modules.Auth.Application.Queries;
 using System.Net.Mime;
 using Swashbuckle.AspNetCore.Filters;
 using SharpInvoice.API.Examples;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
-using MediatR;
 
 /// <summary>
 /// Provides endpoints for user authentication including registration, login, reset password, and token refresh.
@@ -22,7 +19,7 @@ using MediatR;
 [Route("api/auth")]
 [Produces(MediaTypeNames.Application.Json)]
 [EnableRateLimiting("auth")]
-public class AuthController(IMediator mediator) : ControllerBase
+public class AuthController(IAuthService authService) : ControllerBase
 {
     /// <summary>
     /// Registers a new user.
@@ -32,7 +29,7 @@ public class AuthController(IMediator mediator) : ControllerBase
     /// It then sends a confirmation email to verify the user's email address.
     /// After registration, the user should create a business.
     /// </remarks>
-    /// <param name="command">The registration details including email and password.</param>
+    /// <param name="request">The registration details including email and password.</param>
     /// <returns>A response containing the new user's ID.</returns>
     [HttpPost("register")]
     [AllowAnonymous]
@@ -41,10 +38,10 @@ public class AuthController(IMediator mediator) : ControllerBase
     [EndpointDescription("Creates a new user account with the provided information and sends a confirmation email")]
     [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(RegisterResponseDto))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
-    [SwaggerRequestExample(typeof(RegisterUserCommand), typeof(RegisterUserCommandExample))]
-    public async Task<IActionResult> Register([FromBody] RegisterUserCommand command)
+    [SwaggerRequestExample(typeof(RegisterUserRequest), typeof(RegisterUserCommandExample))]
+    public async Task<IActionResult> Register([FromBody] RegisterUserRequest request)
     {
-        var result = await mediator.Send(command);
+        var result = await authService.RegisterUserAsync(request.Email, request.FirstName, request.LastName, request.Password);
         return Created($"api/user/me", result);
     }
 
@@ -55,7 +52,7 @@ public class AuthController(IMediator mediator) : ControllerBase
     /// On successful authentication, if 2FA is not enabled, it returns JWT access and refresh tokens.
     /// If 2FA is enabled, it returns a challenge indicating a verification code has been sent.
     /// </remarks>
-    /// <param name="command">The login credentials including email and password.</param>
+    /// <param name="request">The login credentials including email and password.</param>
     /// <returns>Authentication response with tokens or 2FA challenge.</returns>
     [HttpPost("login")]
     [AllowAnonymous]
@@ -65,11 +62,11 @@ public class AuthController(IMediator mediator) : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(LoginResponseDto))]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AuthResponseDto))]
     [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(ProblemDetails))]
-    [SwaggerRequestExample(typeof(LoginUserCommand), typeof(LoginUserCommandExample))]
+    [SwaggerRequestExample(typeof(LoginUserRequest), typeof(LoginUserCommandExample))]
     [SwaggerResponseExample(StatusCodes.Status200OK, typeof(LoginResponseDtoExample))]
-    public async Task<IActionResult> Login([FromBody] LoginUserCommand command)
+    public async Task<IActionResult> Login([FromBody] LoginUserRequest request)
     {
-        var result = await mediator.Send(command);
+        var result = await authService.LoginAsync(request.Email, request.Password);
         if (result.IsTwoFactorRequired)
         {
             return Ok(new { result.IsTwoFactorRequired, result.Message });
@@ -92,11 +89,11 @@ public class AuthController(IMediator mediator) : ControllerBase
     [EndpointDescription("Verifies the two-factor authentication code to complete the login process")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AuthResponseDto))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
-    [SwaggerRequestExample(typeof(VerifyTwoFactorCommand), typeof(VerifyTwoFactorCommandExample))]
+    [SwaggerRequestExample(typeof(VerifyTwoFactorRequest), typeof(VerifyTwoFactorCommandExample))]
     [SwaggerResponseExample(StatusCodes.Status200OK, typeof(AuthResponseDtoExample))]
-    public async Task<IActionResult> VerifyTwoFactor([FromBody] VerifyTwoFactorCommand request)
+    public async Task<IActionResult> VerifyTwoFactor([FromBody] VerifyTwoFactorRequest request)
     {
-        var result = await mediator.Send(request);
+        var result = await authService.VerifyTwoFactorAsync(request.Email, request.VerificationCode);
         return Ok(result);
     }
 
@@ -106,7 +103,7 @@ public class AuthController(IMediator mediator) : ControllerBase
     /// <remarks>
     /// Uses a valid refresh token to generate a new JWT access token without requiring user credentials.
     /// </remarks>
-    /// <param name="command">The refresh token details.</param>
+    /// <param name="request">The refresh token details.</param>
     /// <returns>Authentication response with new tokens.</returns>
     [HttpPost("refresh-token")]
     [AllowAnonymous]
@@ -115,11 +112,11 @@ public class AuthController(IMediator mediator) : ControllerBase
     [EndpointDescription("Uses a valid refresh token to generate a new JWT access token")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AuthResponseDto))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
-    [SwaggerRequestExample(typeof(RefreshTokenCommand), typeof(RefreshTokenRequestExample))]
+    [SwaggerRequestExample(typeof(RefreshTokenRequest), typeof(RefreshTokenRequestExample))]
     [SwaggerResponseExample(StatusCodes.Status200OK, typeof(AuthResponseDtoExample))]
-    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenCommand command)
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
     {
-        var result = await mediator.Send(command);
+        var result = await authService.RefreshTokenAsync(request.RefreshToken);
         return Ok(result);
     }
 
@@ -141,8 +138,7 @@ public class AuthController(IMediator mediator) : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
     public async Task<IActionResult> ConfirmEmail([FromQuery] Guid userId, [FromQuery] string token)
     {
-        var command = new ConfirmEmailCommand(userId, token);
-        var success = await mediator.Send(command);
+        var success = await authService.ConfirmEmailAsync(userId, token);
         if (!success) return BadRequest(new { Message = "Invalid email confirmation link." });
         return Ok(new { Message = "Email confirmed successfully." });
     }
@@ -193,7 +189,7 @@ public class AuthController(IMediator mediator) : ControllerBase
             return BadRequest(new { Message = $"Error from external provider: {remoteError}" });
         }
 
-        var result = await mediator.Send(new HandleExternalLoginCommand());
+        var result = await authService.HandleExternalLoginAsync();
 
         // Here you would typically redirect to the frontend with the tokens
         // For an API, we can return the tokens directly.
@@ -207,7 +203,7 @@ public class AuthController(IMediator mediator) : ControllerBase
     /// If a user with the specified email exists, an email with a password reset link is sent.
     /// For security reasons, the API returns a success message even if the email doesn't exist.
     /// </remarks>
-    /// <param name="command">The command containing the user's email.</param>
+    /// <param name="request">The request containing the user's email.</param>
     /// <returns>A confirmation message.</returns>
     [HttpPost("forgot-password")]
     [AllowAnonymous]
@@ -215,10 +211,10 @@ public class AuthController(IMediator mediator) : ControllerBase
     [EndpointSummary("Request password reset link")]
     [EndpointDescription("Sends a password reset link to the user's email address")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(object))]
-    [SwaggerRequestExample(typeof(ForgotPasswordCommand), typeof(ForgotPasswordCommandExample))]
-    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordCommand command)
+    [SwaggerRequestExample(typeof(ForgotPasswordRequest), typeof(ForgotPasswordCommandExample))]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
-        await mediator.Send(command);
+        await authService.SendPasswordResetEmailAsync(request.Email);
         return Ok(new { Message = "If an account with this email exists, a password reset link has been sent." });
     }
 
@@ -228,7 +224,7 @@ public class AuthController(IMediator mediator) : ControllerBase
     /// <remarks>
     /// The token is sent to the user's email and is required to change the password.
     /// </remarks>
-    /// <param name="command">The command containing the new password, email, and reset token.</param>
+    /// <param name="request">The request containing the new password, email, and reset token.</param>
     /// <returns>A success message or a bad request if the token is invalid.</returns>
     [HttpPost("reset-password")]
     [AllowAnonymous]
@@ -237,10 +233,10 @@ public class AuthController(IMediator mediator) : ControllerBase
     [EndpointDescription("Changes a user's password using a valid reset token")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(object))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
-    [SwaggerRequestExample(typeof(ResetPasswordCommand), typeof(ResetPasswordCommandExample))]
-    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordCommand command)
+    [SwaggerRequestExample(typeof(ResetPasswordRequest), typeof(ResetPasswordCommandExample))]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
     {
-        var success = await mediator.Send(command);
+        var success = await authService.ResetPasswordAsync(request.Email, request.Token, request.NewPassword);
         if (!success) return BadRequest(new { Message = "Invalid token or email." });
         return Ok(new { Message = "Password has been reset successfully." });
     }
@@ -248,7 +244,7 @@ public class AuthController(IMediator mediator) : ControllerBase
     /// <summary>
     /// Logs out the user by revoking the refresh token
     /// </summary>
-    /// <param name="command">The command containing the refresh token to revoke</param>
+    /// <param name="request">The request containing the refresh token to revoke</param>
     /// <returns>Success or failure status</returns>
     [HttpPost("logout")]
     [Authorize]
@@ -257,15 +253,15 @@ public class AuthController(IMediator mediator) : ControllerBase
     [EndpointDescription("Invalidates the refresh token to prevent further token refreshing")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
-    [SwaggerRequestExample(typeof(RevokeTokenCommand), typeof(LogoutRequestExample))]
-    public async Task<IActionResult> Logout([FromBody] RevokeTokenCommand command)
+    [SwaggerRequestExample(typeof(RevokeTokenRequest), typeof(LogoutRequestExample))]
+    public async Task<IActionResult> Logout([FromBody] RevokeTokenRequest request)
     {
-        if (string.IsNullOrEmpty(command.RefreshToken))
+        if (string.IsNullOrEmpty(request.RefreshToken))
         {
             return BadRequest("Refresh token is required");
         }
 
-        var result = await mediator.Send(command);
+        var result = await authService.LogoutAsync(request.RefreshToken);
         if (!result)
         {
             return BadRequest("Invalid token");
@@ -293,8 +289,7 @@ public class AuthController(IMediator mediator) : ControllerBase
             return Unauthorized();
         }
 
-        var query = new GetLinkedAccountsQuery(userIdGuid);
-        var linkedAccounts = await mediator.Send(query);
+        var linkedAccounts = await authService.GetLinkedAccountsAsync(userIdGuid);
         return Ok(linkedAccounts);
     }
 
@@ -368,8 +363,7 @@ public class AuthController(IMediator mediator) : ControllerBase
             return BadRequest(new { Message = "External provider did not provide a unique identifier." });
         }
 
-        var command = new LinkAccountCommand(userIdGuid, provider, providerKey);
-        var success = await mediator.Send(command);
+        var success = await authService.LinkAccountAsync(userIdGuid, provider, providerKey);
 
         if (!success)
         {
@@ -396,8 +390,7 @@ public class AuthController(IMediator mediator) : ControllerBase
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new InvalidOperationException("User identifier not found."));
 
-        var command = new UnlinkAccountCommand(userId, provider);
-        await mediator.Send(command);
+        await authService.UnlinkAccountAsync(userId, provider);
 
         return Ok(new { Message = "Account unlinked successfully" });
     }
@@ -410,3 +403,12 @@ public class AuthController(IMediator mediator) : ControllerBase
         return properties;
     }
 }
+
+// Request DTOs to replace MediatR commands
+public record RegisterUserRequest(string Email, string FirstName, string LastName, string Password);
+public record LoginUserRequest(string Email, string Password);
+public record VerifyTwoFactorRequest(string Email, string VerificationCode);
+public record RefreshTokenRequest(string RefreshToken);
+public record ForgotPasswordRequest(string Email);
+public record ResetPasswordRequest(string Email, string Token, string NewPassword);
+public record RevokeTokenRequest(string RefreshToken);

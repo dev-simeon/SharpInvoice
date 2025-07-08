@@ -31,11 +31,8 @@ using Azure.Security.KeyVault.Secrets;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
-using SharpInvoice.Modules.Auth.Application.Commands;
 using Microsoft.AspNetCore.Authorization;
 using SharpInvoice.API.Authorization;
-using MediatR;
-using SharpInvoice.API.Behaviors;
 
 // --- 1. BOOTSTRAP SERILOG ---
 // Configure a logger for application startup. This is separate from the main
@@ -126,12 +123,10 @@ try
     // Add the background service to clean up expired refresh tokens
     builder.Services.AddHostedService<RefreshTokenCleanupService>();
 
-    // Register MediatR and scan the Application assembly for handlers
-    builder.Services.AddMediatR(cfg =>
-    {
-        cfg.RegisterServicesFromAssemblyContaining<RegisterUserCommand>();
-        cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
-    });
+    // Register the new service layer implementations
+    builder.Services.AddScoped<SharpInvoice.Modules.UserManagement.Application.Interfaces.IBusinessService, SharpInvoice.Modules.UserManagement.Infrastructure.Services.BusinessService>();
+    builder.Services.AddScoped<SharpInvoice.Modules.UserManagement.Application.Interfaces.ITeamMemberService, SharpInvoice.Modules.UserManagement.Infrastructure.Services.TeamMemberService>();
+    builder.Services.AddScoped<SharpInvoice.Modules.UserManagement.Application.Interfaces.IProfileService, SharpInvoice.Modules.UserManagement.Infrastructure.Services.ProfileService>();
 
     // Configure SendGrid email service. The settings are bound from appsettings.json
     // and can be overridden by environment-specific files or Key Vault.

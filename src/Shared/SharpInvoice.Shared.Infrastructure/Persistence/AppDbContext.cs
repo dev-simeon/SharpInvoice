@@ -1,6 +1,5 @@
 ﻿namespace SharpInvoice.Shared.Infrastructure.Persistence;
 
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using SharpInvoice.Modules.Auth.Domain.Entities;
 using SharpInvoice.Modules.Invoicing.Domain.Entities;
@@ -14,8 +13,7 @@ using System.Threading.Tasks;
 
 public class AppDbContext(
     DbContextOptions<AppDbContext> options,
-    ICurrentUserProvider currentUserProvider,
-    IMediator mediator) : DbContext(options)
+    ICurrentUserProvider currentUserProvider) : DbContext(options)
 {
     public DbSet<User> Users { get; set; }
     public DbSet<ExternalLogin> ExternalLogins { get; set; }
@@ -46,8 +44,7 @@ public class AppDbContext(
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        await DispatchDomainEventsAsync();
-
+        // Handle audit fields
         var currentUserId = currentUserProvider.GetCurrentUserId().ToString();
         var now = DateTime.UtcNow;
 
@@ -66,11 +63,7 @@ public class AppDbContext(
             }
         }
 
-        return await base.SaveChangesAsync(cancellationToken);
-    }
-
-    private async Task DispatchDomainEventsAsync()
-    {
+        // Clear domain events since we're not using them with the new architecture
         var domainEventEntities = ChangeTracker.Entries<Entity<Guid>>()
             .Select(e => e.Entity)
             .Where(e => e.DomainEvents.Any())
@@ -78,12 +71,9 @@ public class AppDbContext(
 
         foreach (var entity in domainEventEntities)
         {
-            var events = entity.DomainEvents.ToArray();
             entity.ClearDomainEvents();
-            foreach (var domainEvent in events)
-            {
-                await mediator.Publish(domainEvent);
-            }
         }
+
+        return await base.SaveChangesAsync(cancellationToken);
     }
 }
