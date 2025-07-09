@@ -5,7 +5,7 @@ using SharpInvoice.Core.Domain.Shared;
 
 public sealed class PasswordResetToken : BaseEntity
 {
-    private PasswordResetToken(Guid id, string token, string userEmail, DateTime expiryDate) 
+    private PasswordResetToken(string token, string userEmail, DateTime expiryDate) 
     {
         Token = token;
         UserEmail = userEmail;
@@ -23,11 +23,12 @@ public sealed class PasswordResetToken : BaseEntity
 
         ArgumentOutOfRangeException.ThrowIfLessThan(validForMinutes, 5, "Validity period must be at least 5 minute.");
 
-        return new PasswordResetToken(Guid.NewGuid(), token, userEmail, DateTime.UtcNow.AddMinutes(validForMinutes));
+        return new PasswordResetToken(token, userEmail, DateTime.UtcNow.AddMinutes(validForMinutes));
     }
 
     public void MarkAsUsed() => IsUsed = true;
 
+    public Guid Id { get; private init; }
     public string Token { get; private init; }
     public string UserEmail { get; private init; }
     public DateTime ExpiryDate { get; private init; }

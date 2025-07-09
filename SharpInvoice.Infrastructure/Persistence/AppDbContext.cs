@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SharpInvoice.Core.Domain.Entities;
+using SharpInvoice.Infrastructure.Persistence.Configurations;
 
 namespace SharpInvoice.Infrastructure.Persistence;
 
@@ -16,4 +17,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Transaction> Transactions { get; set; }
     public DbSet<PasswordResetToken> PasswordResets { get; set; }
 
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(UserConfiguration).Assembly);
+        base.OnModelCreating(modelBuilder);
+    }
 }
