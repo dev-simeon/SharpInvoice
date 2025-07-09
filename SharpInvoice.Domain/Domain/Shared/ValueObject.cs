@@ -1,5 +1,8 @@
 namespace SharpInvoice.Core.Domain.Shared;
 
+using System.Collections.Generic;
+using System.Linq;
+
 /// <summary>
 /// A base class for value objects.
 /// </summary>

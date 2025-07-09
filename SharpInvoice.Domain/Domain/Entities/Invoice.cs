@@ -1,37 +1,14 @@
 ﻿namespace SharpInvoice.Core.Domain.Entities;
 
-using SharpInvoice.Modules.Payments.Domain.Entities;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.ComponentModel.DataAnnotations.Schema;
 using SharpInvoice.Core.Domain.Shared;
+using SharpInvoice.Core.Domain.Enums;
 
-public enum InvoiceStatus { Draft, Sent, Paid, Overdue, Void }
 public sealed class Invoice : AuditableEntity<Guid>
 {
-    public Guid BusinessId { get; private init; }
-    public Guid ClientId { get; private init; }
-    public Client Client { get; private init; } = null!;
-    public string InvoiceNumber { get; private set; }
-    public DateTime IssueDate { get; private set; }
-    public DateTime DueDate { get; private set; }
-    [Column(TypeName = "decimal(18, 2)")]
-    public decimal SubTotal { get; private set; }
-    [Column(TypeName = "decimal(18, 2)")]
-    public decimal Tax { get; private set; }
-    [Column(TypeName = "decimal(18, 2)")]
-    public decimal Total { get; private set; }
-    [Column(TypeName = "decimal(18, 2)")]
-    public decimal AmountPaid { get; private set; }
-    public string Currency { get; private set; }
-    public InvoiceStatus Status { get; private set; }
-    public string? Notes { get; private set; }
-    public string? Terms { get; private set; }
-
-    private readonly List<InvoiceItem> _items = [];
-    public IReadOnlyCollection<InvoiceItem> Items => _items.AsReadOnly();
-
-    private readonly List<Transaction> _transactions = [];
-    public IReadOnlyCollection<Transaction> Transactions => _transactions.AsReadOnly();
-
     private Invoice(Guid id, Guid businessId, Guid clientId, string invoiceNumber, string currency) : base(id)
     {
         BusinessId = businessId;
@@ -46,10 +23,15 @@ public sealed class Invoice : AuditableEntity<Guid>
     public static Invoice Create(Guid businessId, Guid clientId, string invoiceNumber, string currency, bool businessIsActive)
     {
         if (!businessIsActive)
-        {
             throw new InvalidOperationException("Invoices cannot be added to an inactive business.");
-        }
-        return new(Guid.NewGuid(), businessId, clientId, invoiceNumber, currency);
+
+        if (string.IsNullOrWhiteSpace(invoiceNumber))
+            throw new ArgumentException("Invoice number cannot be empty.", nameof(invoiceNumber));
+
+        if (string.IsNullOrWhiteSpace(currency))
+            throw new ArgumentException("Currency cannot be empty.", nameof(currency));
+
+        return new Invoice(Guid.NewGuid(), businessId, clientId, invoiceNumber, currency);
     }
 
     public void UpdateDetails(DateTime issueDate, DateTime dueDate, string? notes, string? terms)
@@ -106,5 +88,30 @@ public sealed class Invoice : AuditableEntity<Guid>
         Total = SubTotal + Tax;
     }
 
-    private Invoice() { InvoiceNumber = string.Empty; Currency = string.Empty; Client = null!; } // EF Core
+    public Guid BusinessId { get; private init; }
+    public Guid ClientId { get; private init; }
+    public Client Client { get; private init; } = null!;
+    public string InvoiceNumber { get; private set; }
+    public DateTime IssueDate { get; private set; }
+    public DateTime DueDate { get; private set; }
+    [Column(TypeName = "decimal(18, 2)")]
+    public decimal SubTotal { get; private set; }
+    [Column(TypeName = "decimal(18, 2)")]
+    public decimal Tax { get; private set; }
+    [Column(TypeName = "decimal(18, 2)")]
+    public decimal Total { get; private set; }
+    [Column(TypeName = "decimal(18, 2)")]
+    public decimal AmountPaid { get; private set; }
+    public string Currency { get; private set; }
+    public InvoiceStatus Status { get; private set; }
+    public string? Notes { get; private set; }
+    public string? Terms { get; private set; }
+
+    private readonly List<InvoiceItem> _items = [];
+    public IReadOnlyCollection<InvoiceItem> Items => _items.AsReadOnly();
+
+    private readonly List<Transaction> _transactions = [];
+    public IReadOnlyCollection<Transaction> Transactions => _transactions.AsReadOnly();
+
+    private Invoice() { InvoiceNumber = string.Empty; Currency = string.Empty; Client = null!; }
 }

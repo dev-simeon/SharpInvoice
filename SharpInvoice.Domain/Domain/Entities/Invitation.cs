@@ -1,25 +1,14 @@
-﻿namespace SharpInvoice.Modules.UserManagement.Domain.Entities;
+﻿namespace SharpInvoice.Core.Domain.Entities;
 
-using System.ComponentModel.DataAnnotations;
-using SharpInvoice.Shared.Kernel.Exceptions;
+using System;
+using System.Collections.Generic;
 using System.Security.Cryptography;
-using SharpInvoice.Modules.UserManagement.Domain.Events;
-using SharpInvoice.Core.Domain.Entities;
+using SharpInvoice.Core.Domain.Enums;
 using SharpInvoice.Core.Domain.Shared;
 
-public enum InvitationStatus { Pending, Accepted, Expired }
-public sealed class Invitation : Entity<Guid>
+public sealed class Invitation : AuditableEntity<Guid>
 {
-    [Required] public Guid BusinessId { get; private init; }
-    public Business Business { get; private init; } = null!;
-    [Required][EmailAddress] public string InvitedUserEmail { get; private init; }
-    [Required] public Guid RoleId { get; private init; }
-    public Role Role { get; private init; } = null!;
-    [Required] public string Token { get; private init; }
-    [Required] public DateTime ExpiryDate { get; private init; }
-    [Required] public InvitationStatus Status { get; private set; }
-
-    private Invitation(Guid id, Guid businessId, string email, Guid roleId, string token, DateTime expiry) : base(id)
+   private Invitation(Guid id, Guid businessId, string email, Guid roleId, string token, DateTime expiry) : base(id)
     {
         BusinessId = businessId;
         InvitedUserEmail = email;
@@ -32,17 +21,15 @@ public sealed class Invitation : Entity<Guid>
     public static Invitation Create(Guid businessId, string email, Guid roleId, int validityInHours, ICollection<TeamMember> existingMembers)
     {
         if (string.IsNullOrWhiteSpace(email))
-            throw new BadRequestException("Invited email cannot be empty.");
+            throw new ArgumentException("Invited email cannot be empty.", nameof(email));
 
         if (existingMembers.Any(m => m.User.Email.Equals(email, StringComparison.OrdinalIgnoreCase)))
-            throw new BadRequestException("A team member with this email already exists.");
+            throw new InvalidOperationException("A team member with this email already exists.");
 
         var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var expiry = DateTime.UtcNow.AddHours(validityInHours);
 
-        var invitation = new Invitation(Guid.NewGuid(), businessId, email, roleId, token, expiry);
-        invitation.AddDomainEvent(new InvitationSentDomainEvent(invitation.Id));
-        return invitation;
+        return new Invitation(Guid.NewGuid(), businessId, email, roleId, token, expiry);
     }
 
     public void Accept()
@@ -62,5 +49,15 @@ public sealed class Invitation : Entity<Guid>
             Status = InvitationStatus.Expired;
     }
 
-    private Invitation() { InvitedUserEmail = string.Empty; Token = string.Empty; Role = null!; Business = null!; } // EF Core
+    public Guid BusinessId { get; private init; }
+    public Business Business { get; private init; } = null!;
+    public string InvitedUserEmail { get; private init; }
+    public Guid RoleId { get; private init; }
+    public Role Role { get; private init; } = null!;
+    public string Token { get; private init; }
+    public DateTime ExpiryDate { get; private init; }
+    public InvitationStatus Status { get; private set; }
+
+
+    private Invitation() { InvitedUserEmail = string.Empty; Token = string.Empty; Role = null!; Business = null!; }
 }

@@ -1,36 +1,11 @@
 namespace SharpInvoice.Core.Domain.Entities;
 
-using System.Text;
-using System.Text.Json;
+using System;
+using System.Collections.Generic;
 using SharpInvoice.Core.Domain.Shared;
-using SharpInvoice.Modules.UserManagement.Domain.Entities;
 
 public sealed class Business : AuditableEntity<Guid>
-{
-    public string Name { get; private set; }
-    public bool IsActive { get; private set; }
-    public Guid OwnerId { get; private init; }
-    public string? Address { get; private set; }
-    public string? City { get; private set; }
-    public string? State { get; private set; }
-    public string? ZipCode { get; private set; }
-    public string Country { get; private set; }
-    public string? PhoneNumber { get; private set; }
-    public string? Email { get; private set; }
-    public string? Website { get; private set; }
-    public string? LogoUrl { get; private set; }
-
-    /// <summary>
-    /// Stores theme settings as a JSON string. e.g., { "primary": "#FFFFFF", "secondary": "#000000" }
-    /// </summary>
-    public string ThemeSettings { get; private set; }
-
-    private readonly List<TeamMember> _teamMembers = [];
-    public IReadOnlyCollection<TeamMember> TeamMembers => _teamMembers.AsReadOnly();
-
-    private readonly List<Invitation> _invitations = [];
-    public IReadOnlyCollection<Invitation> Invitations => _invitations.AsReadOnly();
-
+{       
     private Business(Guid id, string name, Guid ownerId, string country) : base(id)
     {
         Name = name;
@@ -43,9 +18,9 @@ public sealed class Business : AuditableEntity<Guid>
     public static Business Create(string name, Guid ownerId, string country)
     {
         if (string.IsNullOrWhiteSpace(name))
-            throw new BadRequestException("Business name cannot be empty.");
+            throw new ArgumentException("Business name cannot be empty.", nameof(name));
         if (string.IsNullOrWhiteSpace(country))
-            throw new BadRequestException("Country cannot be empty.");
+            throw new ArgumentException("Country cannot be empty.", nameof(country));
 
         return new(Guid.NewGuid(), name, ownerId, country);
     }
@@ -53,7 +28,7 @@ public sealed class Business : AuditableEntity<Guid>
     public void UpdateDetails(string name, string? email, string? phone, string? website)
     {
         if (string.IsNullOrWhiteSpace(name))
-            throw new BadRequestException("Business name cannot be empty.");
+            throw new ArgumentException("Business name cannot be empty.", nameof(name));
 
         Name = name;
         Email = email;
@@ -64,7 +39,7 @@ public sealed class Business : AuditableEntity<Guid>
     public void UpdateAddress(string? address, string? city, string? state, string? zip, string country)
     {
         if (string.IsNullOrWhiteSpace(country))
-            throw new BadRequestException("Country cannot be empty.");
+            throw new ArgumentException("Country cannot be empty.", nameof(country));
 
         Address = address;
         City = city;
@@ -77,11 +52,11 @@ public sealed class Business : AuditableEntity<Guid>
     {
         try
         {
-            JsonDocument.Parse(themeSettingsJson);
+            System.Text.Json.JsonDocument.Parse(themeSettingsJson);
         }
-        catch (JsonException ex)
+        catch (System.Text.Json.JsonException ex)
         {
-            throw new BadRequestException($"Theme settings must be a valid JSON string. Details: {ex.Message}");
+            throw new ArgumentException($"Theme settings must be a valid JSON string. Details: {ex.Message}", nameof(themeSettingsJson));
         }
 
         LogoUrl = logoUrl;
@@ -93,7 +68,7 @@ public sealed class Business : AuditableEntity<Guid>
 
     public string GetFormattedAddress()
     {
-        var addressBuilder = new StringBuilder();
+        var addressBuilder = new System.Text.StringBuilder();
         if (!string.IsNullOrWhiteSpace(Address)) addressBuilder.AppendLine(Address);
         if (!string.IsNullOrWhiteSpace(City)) addressBuilder.Append($"{City}, ");
         if (!string.IsNullOrWhiteSpace(State)) addressBuilder.Append($"{State} ");
@@ -102,6 +77,28 @@ public sealed class Business : AuditableEntity<Guid>
         return addressBuilder.ToString().Trim();
     }
 
+    public string Name { get; private set; }
+    public bool IsActive { get; private set; }
+    public Guid OwnerId { get; private init; }
+    public string? Address { get; private set; }
+    public string? City { get; private set; }
+    public string? State { get; private set; }
+    public string? ZipCode { get; private set; }
+    public string Country { get; private set; }
+    public string? PhoneNumber { get; private set; }
+    public string? Email { get; private set; }
+    public string? Website { get; private set; }
+    public string? LogoUrl { get; private set; }
+    public string ThemeSettings { get; private set; }
+
+    private readonly List<TeamMember> _teamMembers = [];
+    public IReadOnlyCollection<TeamMember> TeamMembers => _teamMembers.AsReadOnly();
+
+    private readonly List<Invitation> _invitations = [];
+    public IReadOnlyCollection<Invitation> Invitations => _invitations.AsReadOnly();
+
+
+    // EF Core
     private Business()
     {
         Name = string.Empty;

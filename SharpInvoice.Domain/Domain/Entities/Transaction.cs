@@ -1,19 +1,12 @@
-﻿namespace SharpInvoice.Modules.Payments.Domain.Entities;
+﻿namespace SharpInvoice.Core.Domain.Entities;
 
+using System;
 using SharpInvoice.Core.Domain.Shared;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using SharpInvoice.Core.Domain.Enums;
 
-public enum PaymentMethod { Stripe, BankTransfer, Cash }
 public sealed class Transaction : AuditableEntity<Guid>
 {
-    [Required] public Guid InvoiceId { get; private init; }
-    [Required][Column(TypeName = "decimal(18, 2)")] public decimal Amount { get; private init; }
-    [Required] public DateTime TransactionDate { get; private init; }
-    [Required] public PaymentMethod PaymentMethod { get; private init; }
-    [MaxLength(256)] public string? ExternalTransactionId { get; private init; }
-    public string? Notes { get; private set; }
-
     private Transaction(Guid id, Guid invoiceId, decimal amount, DateTime date, PaymentMethod method, string? externalId) : base(id)
     {
         InvoiceId = invoiceId;
@@ -29,6 +22,14 @@ public sealed class Transaction : AuditableEntity<Guid>
     }
 
     public void AddNote(string note) => Notes = note;
+
+    public Guid InvoiceId { get; private init; }
+    [Column(TypeName = "decimal(18, 2)")]
+    public decimal Amount { get; private init; }
+    public DateTime TransactionDate { get; private init; }
+    public PaymentMethod PaymentMethod { get; private init; }
+    public string? ExternalTransactionId { get; private init; }
+    public string? Notes { get; private set; }
 
     private Transaction() { } // EF Core
 }

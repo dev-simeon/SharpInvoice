@@ -1,27 +1,29 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿namespace SharpInvoice.Core.Domain.Entities;
 
-namespace SharpInvoice.Core.Domain.Entities
+using System;
+using System.Collections.Generic;
+using SharpInvoice.Core.Domain.Shared;
+
+public sealed class Role : AuditableEntity<Guid>
 {
-    public sealed class Role : AuditableEntity<Guid>
+    private Role(Guid id, string name, string? description) : base(id)
     {
-        [Required]
-        [MaxLength(100)]
-        public string Name { get; private set; }
-
-        [MaxLength(500)]
-        public string? Description { get; private set; }
-
-        private readonly List<RolePermission> _permissions = new();
-        public IReadOnlyCollection<RolePermission> Permissions => _permissions.AsReadOnly();
-
-        public ICollection<TeamMember> TeamMembers { get; private set; } = [];
-
-        private Role(Guid id, string name, string? description) : base(id)
-        {
-            Name = name; Description = description;
-        }
-        public static Role Create(string name, string? description) => new(Guid.NewGuid(), name, description);
-        public void UpdateDescription(string? description) => Description = description;
-        private Role() { Name = string.Empty; } // EF Core
+        Name = name;
+        Description = description;
     }
+    public static Role Create(string name, string? description)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Role name cannot be empty.", nameof(name));
+        return new Role(Guid.NewGuid(), name, description);
+    }
+
+    public void UpdateDescription(string? description) => Description = description;
+
+    public string Name { get; private set; }
+    public string? Description { get; private set; }
+
+    public ICollection<TeamMember> TeamMembers { get; private set; } = [];
+
+    private Role() { Name = string.Empty; }
 }

@@ -1,6 +1,5 @@
 namespace SharpInvoice.Core.Domain.Shared;
 
-
 /// <summary>
 /// Base class for all entities in the domain.
 /// </summary>

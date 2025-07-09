@@ -1,5 +1,7 @@
 ﻿namespace SharpInvoice.Core.Domain.Shared;
 
+using System;
+
 public abstract class AuditableEntity<TId> : Entity<TId> where TId : notnull
 {
     public DateTime CreatedAt { get; internal set; }

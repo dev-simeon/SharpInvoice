@@ -1,8 +1,7 @@
-﻿namespace SharpInvoice.Core.Domain.Enums
-{
-    //public enum Role
-    //{
-    //    OWNER,
-    //    ADMIN,
-    //}
-}
+﻿namespace SharpInvoice.Core.Domain.Enums;
+
+//public enum Role
+//{
+//    OWNER,
+//    ADMIN,
+//}
