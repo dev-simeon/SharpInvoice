@@ -1,11 +1,11 @@
 ﻿namespace SharpInvoice.Modules.UserManagement.Domain.Entities;
 
-using SharpInvoice.Shared.Kernel.Domain;
 using System.ComponentModel.DataAnnotations;
 using SharpInvoice.Shared.Kernel.Exceptions;
 using System.Security.Cryptography;
 using SharpInvoice.Modules.UserManagement.Domain.Events;
 using SharpInvoice.Core.Domain.Entities;
+using SharpInvoice.Core.Domain.Shared;
 
 public enum InvitationStatus { Pending, Accepted, Expired }
 public sealed class Invitation : Entity<Guid>

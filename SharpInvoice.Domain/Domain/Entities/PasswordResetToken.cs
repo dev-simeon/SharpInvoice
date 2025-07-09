@@ -1,6 +1,6 @@
 namespace SharpInvoice.Modules.Auth.Domain.Entities;
 
-using SharpInvoice.Shared.Kernel.Domain;
+using SharpInvoice.Core.Domain.Shared;
 using System.ComponentModel.DataAnnotations;
 
 public sealed class PasswordResetToken : Entity<Guid>

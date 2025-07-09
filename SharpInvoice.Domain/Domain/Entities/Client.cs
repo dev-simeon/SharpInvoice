@@ -1,10 +1,8 @@
 ﻿namespace SharpInvoice.Core.Domain.Entities;
-
-using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
 using SharpInvoice.Core.Domain.Shared;
 
-public sealed class Client : AuditableEntity<>
+public sealed class Client : AuditableEntity<Guid>
 {
     public Guid BusinessId { get; private init; }
     public string Name { get; private set; }
@@ -14,7 +12,7 @@ public sealed class Client : AuditableEntity<>
     public string? Country { get; private set; }
     public string? Locale { get; private set; }
 
-    private readonly List<Invoice> _invoices = [];
+    private readonly List<Invoice> _invoices = []; 
     public IReadOnlyCollection<Invoice> Invoices => _invoices.AsReadOnly();
 
     private Client(Guid id, Guid businessId, string name) : base(id)
