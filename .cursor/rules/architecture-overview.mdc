@@ -1,0 +1,25 @@
+# SharpInvoice Architecture Overview
+
+This project follows a **modular monolith** architecture based on **Clean Architecture** principles. The backend is built with ASP.NET Core.
+
+## Project Structure
+
+The solution is organized into modules, each representing a distinct business capability. Key directories include:
+
+- `src/API/SharpInvoice.API`: The main entry point for the application, containing controllers and API-specific configurations.
+- `src/Modules`: This directory contains the individual business modules.
+  - `Auth`: Handles user authentication, registration, and security. ([SharpInvoice.Modules.Auth.Application](mdc:src/Modules/Auth/SharpInvoice.Modules.Auth.Application), [SharpInvoice.Modules.Auth.Domain](mdc:src/Modules/Auth/SharpInvoice.Modules.Auth.Domain), [SharpInvoice.Modules.Auth.Infrastructure](mdc:src/Modules/Auth/SharpInvoice.Modules.Auth.Infrastructure))
+  - `UserManagement`: Manages users, businesses, teams, roles, and permissions. ([SharpInvoice.Modules.UserManagement.Application](mdc:src/Modules/UserManagement/SharpInvoice.Modules.UserManagement.Application), [SharpInvoice.Modules.UserManagement.Domain](mdc:src/Modules/UserManagement/SharpInvoice.Modules.UserManagement.Domain), [SharpInvoice.Modules.UserManagement.Infrastructure](mdc:src/Modules/UserManagement/SharpInvoice.Modules.UserManagement.Infrastructure))
+  - `Invoicing`: Contains logic for creating and managing invoices and clients. ([SharpInvoice.Modules.Invoicing.Application](mdc:src/Modules/Invoicing/SharpInvoice.Modules.Invoicing.Application), [SharpInvoice.Modules.Invoicing.Domain](mdc:src/Modules/Invoicing/SharpInvoice.Modules.Invoicing.Domain), [SharpInvoice.Modules.Invoicing.Infrastructure](mdc:src/Modules/Invoicing/SharpInvoice.Modules.Invoicing.Infrastructure))
+  - `Payments`: Responsible for payment processing and transaction management. ([SharpInvoice.Modules.Payments.Application](mdc:src/Modules/Payments/SharpInvoice.Modules.Payments.Application), [SharpInvoice.Modules.Payments.Domain](mdc:src/Modules/Payments/SharpInvoice.Modules.Payments.Domain), [SharpInvoice.Modules.Payments.Infrastructure](mdc:src/Modules/Payments/SharpInvoice.Modules.Payments.Infrastructure))
+- `src/Shared`: Contains cross-cutting concerns.
+  - `SharpInvoice.Shared.Kernel`: Core abstractions, domain primitives, and exceptions.
+  - `SharpInvoice.Shared.Infrastructure`: Shared infrastructure components like the `AppDbContext`, migrations, and implementations for cross-cutting interfaces.
+
+## Clean Architecture Layers
+
+Each module is structured according to Clean Architecture:
+
+- **Domain**: Contains entities, aggregates, domain events, and value objects. It has no dependencies on other layers.
+- **Application**: Contains application logic, service interfaces, DTOs, and orchestrates the domain layer.
+- **Infrastructure**: Contains implementations for interfaces defined in the Application layer, such as repositories, external service clients (e.g., email), and database configurations.

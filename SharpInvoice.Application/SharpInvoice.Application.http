@@ -1,0 +1,6 @@
+@SharpInvoice.Application_HostAddress = http://localhost:5130
+
+GET {{SharpInvoice.Application_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
