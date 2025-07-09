@@ -7,9 +7,9 @@ using System.ComponentModel.DataAnnotations.Schema;
 using SharpInvoice.Core.Domain.Shared;
 using SharpInvoice.Core.Domain.Enums;
 
-public sealed class Invoice : AuditableEntity<Guid>
+public sealed class Invoice : BaseEntity
 {
-    private Invoice(Guid id, Guid businessId, Guid clientId, string invoiceNumber, string currency) : base(id)
+    private Invoice(Guid businessId, Guid clientId, string invoiceNumber, string currency) 
     {
         BusinessId = businessId;
         ClientId = clientId;
@@ -31,11 +31,14 @@ public sealed class Invoice : AuditableEntity<Guid>
         if (string.IsNullOrWhiteSpace(currency))
             throw new ArgumentException("Currency cannot be empty.", nameof(currency));
 
-        return new Invoice(Guid.NewGuid(), businessId, clientId, invoiceNumber, currency);
+        return new Invoice(businessId, clientId, invoiceNumber, currency);
     }
 
     public void UpdateDetails(DateTime issueDate, DateTime dueDate, string? notes, string? terms)
     {
+        if (issueDate.Date < DateTime.UtcNow.Date)
+            throw new ArgumentException("Issue date cannot be in the past.", nameof(issueDate));
+        
         IssueDate = issueDate;
         DueDate = dueDate;
         Notes = notes;
@@ -88,6 +91,7 @@ public sealed class Invoice : AuditableEntity<Guid>
         Total = SubTotal + Tax;
     }
 
+    public Guid Id { get; private init; }
     public Guid BusinessId { get; private init; }
     public Guid ClientId { get; private init; }
     public Client Client { get; private init; } = null!;

@@ -5,9 +5,9 @@ using SharpInvoice.Core.Domain.Shared;
 using System.ComponentModel.DataAnnotations.Schema;
 using SharpInvoice.Core.Domain.Enums;
 
-public sealed class Transaction : AuditableEntity<Guid>
+public sealed class Transaction : BaseEntity
 {
-    private Transaction(Guid id, Guid invoiceId, decimal amount, DateTime date, PaymentMethod method, string? externalId) : base(id)
+    private Transaction(Guid id, Guid invoiceId, decimal amount, DateTime date, PaymentMethod method, string? externalId) 
     {
         InvoiceId = invoiceId;
         Amount = amount;

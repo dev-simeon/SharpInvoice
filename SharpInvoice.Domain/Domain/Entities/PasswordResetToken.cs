@@ -3,9 +3,9 @@ namespace SharpInvoice.Core.Domain.Entities;
 using System;
 using SharpInvoice.Core.Domain.Shared;
 
-public sealed class PasswordResetToken : AuditableEntity<Guid>
+public sealed class PasswordResetToken : BaseEntity
 {
-    private PasswordResetToken(Guid id, string token, string userEmail, DateTime expiryDate) : base(id)
+    private PasswordResetToken(Guid id, string token, string userEmail, DateTime expiryDate) 
     {
         Token = token;
         UserEmail = userEmail;

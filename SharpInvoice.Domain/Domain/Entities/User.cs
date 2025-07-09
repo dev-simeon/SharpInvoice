@@ -4,27 +4,22 @@ using System;
 using System.Security.Cryptography;
 using SharpInvoice.Core.Domain.Shared;
 
-public sealed class User : AuditableEntity<Guid>
+public class User : BaseEntity
 {
-    private User(Guid id, string email, string firstName, string lastName) : base(id)
-    {
-        Email = email;
-        FirstName = firstName;
-        LastName = lastName;
-        PasswordHash = string.Empty;
-    }
-
-    public static User Create(string email, string firstName, string lastName, string passwordHash)
+    public User(string email, string firstName, string lastName, string phoneNumber, string passwordHash, string emailToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(email, nameof(email));
         ArgumentException.ThrowIfNullOrWhiteSpace(firstName, nameof(firstName));
         ArgumentException.ThrowIfNullOrWhiteSpace(lastName, nameof(lastName));
+        ArgumentException.ThrowIfNullOrWhiteSpace(phoneNumber, nameof(phoneNumber));
+        ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash, nameof(passwordHash));
 
-        var user = new User(Guid.NewGuid(), email, firstName, lastName);
-        user.SetPasswordHash(passwordHash);
-        user.GenerateEmailConfirmationToken();
-
-        return user;
+        Email = email;
+        FirstName = firstName;
+        LastName = lastName;
+        PhoneNumber = phoneNumber;
+        PasswordHash = passwordHash;
+        EmailConfirmationToken = emailToken;
     }
 
     public void UpdateProfile(string firstName, string lastName)
@@ -113,6 +108,7 @@ public sealed class User : AuditableEntity<Guid>
         TwoFactorCodeExpiry = null;
     }
 
+    public int Id { get; private init; }
     public string Email { get; private init; }
     public string FirstName { get; private set; }
     public string LastName { get; private set; }

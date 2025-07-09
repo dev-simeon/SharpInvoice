@@ -6,9 +6,9 @@ using System.Security.Cryptography;
 using SharpInvoice.Core.Domain.Enums;
 using SharpInvoice.Core.Domain.Shared;
 
-public sealed class Invitation : AuditableEntity<Guid>
+public sealed class Invitation : BaseEntity
 {
-   private Invitation(Guid id, Guid businessId, string email, Guid roleId, string token, DateTime expiry) : base(id)
+   private Invitation(Guid id, Guid businessId, string email, Guid roleId, string token, DateTime expiry) 
     {
         BusinessId = businessId;
         InvitedUserEmail = email;

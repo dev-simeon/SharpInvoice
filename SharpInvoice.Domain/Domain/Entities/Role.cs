@@ -4,9 +4,9 @@ using System;
 using System.Collections.Generic;
 using SharpInvoice.Core.Domain.Shared;
 
-public sealed class Role : AuditableEntity<Guid>
+public sealed class Role : BaseEntity
 {
-    private Role(Guid id, string name, string? description) : base(id)
+    private Role(Guid id, string name, string? description) 
     {
         Name = name;
         Description = description;

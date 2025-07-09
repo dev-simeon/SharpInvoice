@@ -4,9 +4,9 @@ using System;
 using System.Collections.Generic;
 using SharpInvoice.Core.Domain.Shared;
 
-public sealed class Client : AuditableEntity<Guid>
+public sealed class Client : BaseEntity
 {
-    private Client(Guid id, Guid businessId, string name) : base(id)
+    private Client(Guid id, Guid businessId, string name) 
     {
         BusinessId = businessId;
         Name = name;

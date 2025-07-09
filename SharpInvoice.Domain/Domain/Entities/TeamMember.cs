@@ -3,9 +3,9 @@
 using System;
 using SharpInvoice.Core.Domain.Shared;
 
-public sealed class TeamMember : AuditableEntity<Guid>
+public sealed class TeamMember : BaseEntity
 {
-    private TeamMember(Guid id, Guid userId, Guid businessId, Guid roleId) : base(id)
+    private TeamMember(Guid id, Guid userId, Guid businessId, Guid roleId) 
     {
         UserId = userId;
         BusinessId = businessId;

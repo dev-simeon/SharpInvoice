@@ -4,9 +4,9 @@ using System;
 using SharpInvoice.Core.Domain.Shared;
 using System.ComponentModel.DataAnnotations.Schema;
 
-public sealed class InvoiceItem : AuditableEntity<Guid>
+public sealed class InvoiceItem : BaseEntity
 {
-    private InvoiceItem(Guid id, Guid invoiceId, string description, decimal quantity, decimal unitPrice, string? unit) : base(id)
+    private InvoiceItem(Guid invoiceId, string description, decimal quantity, decimal unitPrice, string? unit) 
     {
         InvoiceId = invoiceId;
         Description = description;
@@ -17,7 +17,9 @@ public sealed class InvoiceItem : AuditableEntity<Guid>
     }
 
     internal static InvoiceItem Create(Guid invoiceId, string description, decimal quantity, decimal unitPrice, string? unit)
-        => new(Guid.NewGuid(), invoiceId, description, quantity, unitPrice, unit);
+        => new(invoiceId, description, quantity, unitPrice, unit);
+
+    public Guid Id { get; private init; }
 
     [Column(TypeName = "decimal(18, 2)")]
     public decimal Quantity { get; private init; }
