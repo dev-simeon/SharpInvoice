@@ -91,11 +91,9 @@ public sealed class Business : AuditableEntity<Guid>
     public string? LogoUrl { get; private set; }
     public string ThemeSettings { get; private set; }
 
-    private readonly List<TeamMember> _teamMembers = [];
-    public IReadOnlyCollection<TeamMember> TeamMembers => _teamMembers.AsReadOnly();
+    public readonly List<TeamMember> _teamMembers = [];
 
-    private readonly List<Invitation> _invitations = [];
-    public IReadOnlyCollection<Invitation> Invitations => _invitations.AsReadOnly();
+    public readonly List<Invitation> _invitations = [];
 
 
     // EF Core
