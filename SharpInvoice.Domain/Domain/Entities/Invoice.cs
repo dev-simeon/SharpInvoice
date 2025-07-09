@@ -1,26 +1,28 @@
-﻿namespace SharpInvoice.Modules.Invoicing.Domain.Entities;
+﻿namespace SharpInvoice.Core.Domain.Entities;
 
 using SharpInvoice.Modules.Payments.Domain.Entities;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using SharpInvoice.Core.Domain.Entities;
 using SharpInvoice.Core.Domain.Shared;
 
 public enum InvoiceStatus { Draft, Sent, Paid, Overdue, Void }
 public sealed class Invoice : AuditableEntity<Guid>
 {
-    [Required] public Guid BusinessId { get; private init; }
-    [Required] public Guid ClientId { get; private init; }
+    public Guid BusinessId { get; private init; }
+    public Guid ClientId { get; private init; }
     public Client Client { get; private init; } = null!;
-    [Required][MaxLength(50)] public string InvoiceNumber { get; private set; }
-    [Required] public DateTime IssueDate { get; private set; }
-    [Required] public DateTime DueDate { get; private set; }
-    [Required][Column(TypeName = "decimal(18, 2)")] public decimal SubTotal { get; private set; }
-    [Column(TypeName = "decimal(18, 2)")] public decimal Tax { get; private set; }
-    [Required][Column(TypeName = "decimal(18, 2)")] public decimal Total { get; private set; }
-    [Column(TypeName = "decimal(18, 2)")] public decimal AmountPaid { get; private set; }
-    [Required][MaxLength(3)] public string Currency { get; private set; }
-    [Required] public InvoiceStatus Status { get; private set; }
+    public string InvoiceNumber { get; private set; }
+    public DateTime IssueDate { get; private set; }
+    public DateTime DueDate { get; private set; }
+    [Column(TypeName = "decimal(18, 2)")]
+    public decimal SubTotal { get; private set; }
+    [Column(TypeName = "decimal(18, 2)")]
+    public decimal Tax { get; private set; }
+    [Column(TypeName = "decimal(18, 2)")]
+    public decimal Total { get; private set; }
+    [Column(TypeName = "decimal(18, 2)")]
+    public decimal AmountPaid { get; private set; }
+    public string Currency { get; private set; }
+    public InvoiceStatus Status { get; private set; }
     public string? Notes { get; private set; }
     public string? Terms { get; private set; }
 

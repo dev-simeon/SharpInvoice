@@ -1,32 +1,24 @@
-namespace SharpInvoice.Modules.UserManagement.Domain.Entities;
+namespace SharpInvoice.Core.Domain.Entities;
 
-using System.ComponentModel.DataAnnotations;
 using System.Text;
-using SharpInvoice.Shared.Kernel.Exceptions;
 using System.Text.Json;
 using SharpInvoice.Core.Domain.Shared;
+using SharpInvoice.Modules.UserManagement.Domain.Entities;
 
 public sealed class Business : AuditableEntity<Guid>
 {
-    [Required]
-    [MaxLength(200)]
     public string Name { get; private set; }
-
-    [Required]
     public bool IsActive { get; private set; }
-
-    [Required]
     public Guid OwnerId { get; private init; }
-
-    [MaxLength(255)] public string? Address { get; private set; }
-    [MaxLength(100)] public string? City { get; private set; }
-    [MaxLength(100)] public string? State { get; private set; }
-    [MaxLength(20)] public string? ZipCode { get; private set; }
-    [Required][MaxLength(100)] public string Country { get; private set; }
-    [Phone][MaxLength(50)] public string? PhoneNumber { get; private set; }
-    [EmailAddress][MaxLength(256)] public string? Email { get; private set; }
-    [Url][MaxLength(2048)] public string? Website { get; private set; }
-    [Url][MaxLength(2048)] public string? LogoUrl { get; private set; }
+    public string? Address { get; private set; }
+    public string? City { get; private set; }
+    public string? State { get; private set; }
+    public string? ZipCode { get; private set; }
+    public string Country { get; private set; }
+    public string? PhoneNumber { get; private set; }
+    public string? Email { get; private set; }
+    public string? Website { get; private set; }
+    public string? LogoUrl { get; private set; }
 
     /// <summary>
     /// Stores theme settings as a JSON string. e.g., { "primary": "#FFFFFF", "secondary": "#000000" }
@@ -41,9 +33,9 @@ public sealed class Business : AuditableEntity<Guid>
 
     private Business(Guid id, string name, Guid ownerId, string country) : base(id)
     {
-        Name = name; // Assumes validation happens before this point
+        Name = name;
         OwnerId = ownerId;
-        Country = country; // Assumes validation happens before this point
+        Country = country;
         IsActive = true;
         ThemeSettings = "{}";
     }
@@ -110,5 +102,10 @@ public sealed class Business : AuditableEntity<Guid>
         return addressBuilder.ToString().Trim();
     }
 
-    private Business() { Name = string.Empty; Country = string.Empty; ThemeSettings = "{}"; } // EF Core
+    private Business()
+    {
+        Name = string.Empty;
+        Country = string.Empty;
+        ThemeSettings = "{}";
+    }
 }
