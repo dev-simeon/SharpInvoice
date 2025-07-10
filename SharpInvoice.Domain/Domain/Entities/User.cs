@@ -2,6 +2,7 @@ namespace SharpInvoice.Core.Domain.Entities;
 
 using System;
 using System.Security.Cryptography;
+using SharpInvoice.Core.Domain.Enums;
 using SharpInvoice.Core.Domain.Shared;
 
 public class User : BaseEntity
@@ -112,6 +113,7 @@ public class User : BaseEntity
     public string Email { get; private init; }
     public string FirstName { get; private set; }
     public string LastName { get; private set; }
+    public ApplicationUserRole ApplicationUserRole { get; private set; }
     public string FullName => $"{FirstName} {LastName}";
     public string? AvatarUrl { get; private set; }
     public string? PhoneNumber { get; private set; }

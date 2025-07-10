@@ -6,7 +6,7 @@ using SharpInvoice.Core.Domain.Shared;
 
 public sealed class Business : BaseEntity
 {       
-    private Business(Guid id, string name, Guid ownerId, string country) 
+    private Business(string name, Guid ownerId, string country) 
     {
         Name = name;
         OwnerId = ownerId;
@@ -22,7 +22,7 @@ public sealed class Business : BaseEntity
         if (string.IsNullOrWhiteSpace(country))
             throw new ArgumentException("Country cannot be empty.", nameof(country));
 
-        return new(Guid.NewGuid(), name, ownerId, country);
+        return new(name, ownerId, country);
     }
 
     public void UpdateDetails(string name, string? email, string? phone, string? website)
@@ -77,6 +77,7 @@ public sealed class Business : BaseEntity
         return addressBuilder.ToString().Trim();
     }
 
+    public Guid Id { get; private init; }
     public string Name { get; private set; }
     public bool IsActive { get; private set; }
     public Guid OwnerId { get; private init; }

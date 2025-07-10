@@ -5,7 +5,7 @@ using SharpInvoice.Core.Domain.Shared;
 
 public sealed class TeamMember : BaseEntity
 {
-    private TeamMember(Guid id, Guid userId, Guid businessId, Guid roleId) 
+    private TeamMember(Guid userId, Guid businessId, Guid roleId) 
     {
         UserId = userId;
         BusinessId = businessId;
@@ -14,7 +14,7 @@ public sealed class TeamMember : BaseEntity
 
     public static TeamMember Create(Guid userId, Guid businessId, Guid roleId)
     {
-        return new TeamMember(Guid.NewGuid(), userId, businessId, roleId);
+        return new TeamMember(userId, businessId, roleId);
     }
 
     public void UpdateRole(Guid newRoleId)
