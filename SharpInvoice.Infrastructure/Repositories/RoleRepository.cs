@@ -6,48 +6,47 @@ using SharpInvoice.Infrastructure.Persistence;
 
 namespace SharpInvoice.Infrastructure.Repositories;
 
-public class RoleRepository : IRoleRepository
+/// <summary>
+/// Repository for managing Role entities.
+/// </summary>
+public class RoleRepository(AppDbContext db) : BaseRepository<Role>(db), IRoleRepository
 {
-    private readonly AppDbContext _db;
-
-    public RoleRepository(AppDbContext db)
-    {
-        _db = db;
-    }
-
+    /// <summary>
+    /// Gets a role by its unique identifier.
+    /// </summary>
+    /// <param name="id">The role ID.</param>
+    /// <returns>The role entity if found, null otherwise.</returns>
     public async Task<Role?> GetByIdAsync(string id)
     {
-        return await _db.Roles.FindAsync(id);
+        return await DbSet.FindAsync(id);
     }
 
+    /// <summary>
+    /// Gets a role by its name.
+    /// </summary>
+    /// <param name="name">The role name.</param>
+    /// <returns>The role entity if found, null otherwise.</returns>
     public async Task<Role?> GetByNameAsync(BusinessRole name)
     {
-        return await _db.Roles.FirstOrDefaultAsync(r => r.Name == name);
+        return await DbSet.FirstOrDefaultAsync(r => r.Name == name);
     }
 
+    /// <summary>
+    /// Gets all roles.
+    /// </summary>
+    /// <returns>A collection of all roles.</returns>
     public async Task<IEnumerable<Role>> GetAllAsync()
     {
-        return await _db.Roles.OrderBy(r => (int)r.Name).ToListAsync();
+        return await DbSet.OrderBy(r => (int)r.Name).ToListAsync();
     }
 
+    /// <summary>
+    /// Checks if a role with the specified ID exists.
+    /// </summary>
+    /// <param name="id">The role ID.</param>
+    /// <returns>True if the role exists, false otherwise.</returns>
     public async Task<bool> ExistsAsync(string id)
     {
-        return await _db.Roles.AnyAsync(r => r.Id == id);
-    }
-
-    public async Task AddAsync(Role role)
-    {
-        await _db.Roles.AddAsync(role);
-    }
-
-    public Task UpdateAsync(Role role)
-    {
-        _db.Roles.Update(role);
-        return Task.CompletedTask;
-    }
-
-    public async Task SaveChangesAsync()
-    {
-        await _db.SaveChangesAsync();
+        return await DbSet.AnyAsync(r => r.Id == id);
     }
 } 

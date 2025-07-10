@@ -17,4 +17,8 @@ public abstract class BaseEntity
             DeletedAt = DateTime.UtcNow;
         }
     }
+
+    // Methods for setting timestamps
+    public void SetCreatedNow() => CreatedAt = DateTime.UtcNow;
+    public void SetUpdatedNow() => UpdatedAt = DateTime.UtcNow;
 }

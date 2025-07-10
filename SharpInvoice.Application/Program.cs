@@ -1,10 +1,17 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Scalar.AspNetCore;
 using Serilog;
+using SharpInvoice.Core.Interfaces;
+using SharpInvoice.Core.Interfaces.Repositories;
+using SharpInvoice.Core.Interfaces.Services;
+using SharpInvoice.Infrastructure;
 using SharpInvoice.Infrastructure.Persistence;
+using SharpInvoice.Infrastructure.Repositories;
+using SharpInvoice.Infrastructure.Services;
 using SharpInvoice.Infrastructure.Shared;
 using System.Text;
 
@@ -28,30 +35,13 @@ try
         .ReadFrom.Services(services)
         .Enrich.FromLogContext());
 
+    // B. Infrastructure Services (Database, Repositories, Services)
+    builder.Services.AddInfrastructureServices(builder.Configuration);
 
-    // B. Application Settings
-    // Bind the "AppSettings" section from configuration to the AppSettings POCO class.
+    // C. Authentication & Authorization
     var appSettings = builder.Configuration.GetSection("AppSettings").Get<AppSettings>()
         ?? throw new InvalidOperationException("AppSettings is missing or invalid. Check your configuration.");
-
-    // Register the AppSettings instance as a singleton for dependency injection.
-    builder.Services.AddSingleton(appSettings);
-
-
-    // C. Database Contexts
-    // Register the DbContext for Entity Framework Core.
-    builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseSqlServer(
-            appSettings.ConnectionStrings.SqlDbRemote,
-            sqlOptions => sqlOptions.EnableRetryOnFailure(
-                maxRetryCount: 5,
-                maxRetryDelay: TimeSpan.FromSeconds(10),
-                errorNumbersToAdd: null)
-        ).EnableSensitiveDataLogging()
-         .EnableDetailedErrors()
-         .LogTo(Console.WriteLine, LogLevel.Debug));
-
-    // Add services to the container.
+    
     builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -82,11 +72,23 @@ try
         options.ClientId = appSettings.Authentication.Google.ClientId;
         options.ClientSecret = appSettings.Authentication.Google.ClientSecret;
     });
-    // .AddFacebook(options =>
-    // {
-    //     options.AppId = appSettings.Authentication.Facebook.AppId;
-    //     options.AppSecret = appSettings.Authentication.Facebook.AppSecret;
-    // });
+
+    // D. Add Health Checks
+    builder.Services.AddHealthChecks()
+        .AddCheck("database", () => {
+            try {
+                using var context = new AppDbContext(
+                    new DbContextOptionsBuilder<AppDbContext>()
+                        .UseSqlServer(appSettings.ConnectionStrings.SqlDbRemote)
+                        .Options);
+                context.Database.CanConnect();
+                return HealthCheckResult.Healthy();
+            }
+            catch (Exception ex) {
+                return HealthCheckResult.Unhealthy(ex.Message);
+            }
+        });
+
     builder.Services.AddAuthorization();
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
@@ -114,6 +116,29 @@ try
     
     app.UseSerilogRequestLogging();
 
+    // E. Global Exception Handling
+    app.UseExceptionHandler(appBuilder =>
+    {
+        appBuilder.Run(async context =>
+        {
+            context.Response.StatusCode = 500;
+            context.Response.ContentType = "application/json";
+            
+            var exceptionHandlerFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+            if (exceptionHandlerFeature != null)
+            {
+                // Log the exception
+                Log.Error(exceptionHandlerFeature.Error, "Unhandled exception");
+                
+                await context.Response.WriteAsJsonAsync(new 
+                { 
+                    error = "An unexpected error occurred",
+                    details = app.Environment.IsDevelopment() ? exceptionHandlerFeature.Error.Message : null
+                });
+            }
+        });
+    });
+
     app.Use(async (context, next) =>
     {
         if (context.Request.Path == "/")
@@ -124,10 +149,9 @@ try
         await next();
     });
 
-    // I. Authentication & Authorization
+    // F. Authentication & Authorization
     app.UseAuthentication();
     app.UseAuthorization();
-
 
     app.MapOpenApi("/api/{documentName}/openapi.json").CacheOutput();
     app.MapScalarApiReference("/scalar/v1", options =>
@@ -137,10 +161,10 @@ try
         options.Theme = ScalarTheme.BluePlanet;
     });
 
-
     app.UseHttpsRedirection();
 
-    app.UseAuthorization();
+    // Map health check endpoint
+    app.MapHealthChecks("/health");
 
     app.MapControllers();
 

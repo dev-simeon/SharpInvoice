@@ -11,7 +11,6 @@ public interface IInvoiceRepository
     Task<IEnumerable<Invoice>> GetByStatusAsync(string businessId, InvoiceStatus status);
     Task<bool> ExistsAsync(string id);
     Task<bool> InvoiceNumberExistsAsync(string businessId, string invoiceNumber);
-    Task<string> GenerateNextInvoiceNumberAsync(string businessId);
     Task AddAsync(Invoice invoice);
     Task UpdateAsync(Invoice invoice);
     Task<IEnumerable<Invoice>> GetOverdueInvoicesAsync();

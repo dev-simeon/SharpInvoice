@@ -5,61 +5,67 @@ using SharpInvoice.Infrastructure.Persistence;
 
 namespace SharpInvoice.Infrastructure.Repositories;
 
-public class ClientRepository : IClientRepository
+/// <summary>
+/// Repository for managing Client entities.
+/// </summary>
+public class ClientRepository(AppDbContext db) : BaseRepository<Client>(db), IClientRepository
 {
-    private readonly AppDbContext _db;
-
-    public ClientRepository(AppDbContext db)
-    {
-        _db = db;
-    }
-
+    /// <summary>
+    /// Gets a client by its unique identifier.
+    /// </summary>
+    /// <param name="id">The client ID.</param>
+    /// <returns>The client entity if found, null otherwise.</returns>
     public async Task<Client?> GetByIdAsync(string id)
     {
-        return await _db.Clients.FindAsync(id);
+        return await DbSet.FindAsync(id);
     }
 
+    /// <summary>
+    /// Gets all clients for a specific business.
+    /// </summary>
+    /// <param name="businessId">The business ID.</param>
+    /// <returns>A collection of clients belonging to the specified business.</returns>
     public async Task<IEnumerable<Client>> GetByBusinessIdAsync(string businessId)
     {
-        return await _db.Clients
+        return await DbSet
             .Where(c => c.BusinessId == businessId)
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Checks if a client with the specified ID exists.
+    /// </summary>
+    /// <param name="id">The client ID.</param>
+    /// <returns>True if the client exists, false otherwise.</returns>
     public async Task<bool> ExistsAsync(string id)
     {
-        return await _db.Clients.AnyAsync(c => c.Id == id);
+        return await DbSet.AnyAsync(c => c.Id == id);
     }
 
+    /// <summary>
+    /// Checks if a client has any invoices.
+    /// </summary>
+    /// <param name="id">The client ID.</param>
+    /// <returns>True if the client has invoices, false otherwise.</returns>
     public async Task<bool> HasInvoicesAsync(string id)
     {
-        return await _db.Invoices.AnyAsync(i => i.ClientId == id);
+        return await Context.Invoices.AnyAsync(i => i.ClientId == id);
     }
 
-    public async Task AddAsync(Client client)
-    {
-        await _db.Clients.AddAsync(client);
-    }
-
-    public Task UpdateAsync(Client client)
-    {
-        _db.Clients.Update(client);
-        return Task.CompletedTask;
-    }
-
+    /// <summary>
+    /// Gets a client by email and business ID.
+    /// </summary>
+    /// <param name="email">The client email.</param>
+    /// <param name="businessId">The business ID.</param>
+    /// <returns>The client entity if found, null otherwise.</returns>
     public async Task<Client?> GetByEmailAndBusinessIdAsync(string email, string businessId)
     {
         if (string.IsNullOrEmpty(email))
             return null;
             
-        return await _db.Clients
+        return await DbSet
             .FirstOrDefaultAsync(c => c.Email != null && 
-                                c.Email.ToLower() == email.ToLower() && 
+                                c.Email.Equals(email, StringComparison.CurrentCultureIgnoreCase) && 
                                 c.BusinessId == businessId);
-    }
-
-    public async Task SaveChangesAsync()
-    {
-        await _db.SaveChangesAsync();
     }
 } 

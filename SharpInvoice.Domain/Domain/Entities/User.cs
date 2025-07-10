@@ -36,7 +36,7 @@ public class User : BaseEntity
         ArgumentException.ThrowIfNullOrWhiteSpace(lastName);
         ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash);
 
-        return new User(email, firstName, lastName, passwordHash, ApplicationUserRole.USER, phoneNumber);
+        return new User(email, firstName, lastName, passwordHash, ApplicationUserRole.User, phoneNumber);
     }
 
     public static User CreateApplicationUser(string email, string firstName, string lastName, string passwordHash, ApplicationUserRole role, string? phoneNumber = null)
@@ -46,7 +46,7 @@ public class User : BaseEntity
         ArgumentException.ThrowIfNullOrWhiteSpace(lastName);
         ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash);
 
-        if (role == ApplicationUserRole.USER)
+        if (role == ApplicationUserRole.User)
             throw new ArgumentException("Cannot create an application user with the default 'USER' role. Use Register() instead.", nameof(role));
 
         return new User(email, firstName, lastName, passwordHash, role, phoneNumber);

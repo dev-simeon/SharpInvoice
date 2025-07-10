@@ -2,8 +2,8 @@
 {
     public enum ApplicationUserRole
     {
-        SUPER_ADMIN = 1,
-        STAFF = 2,
-        USER = 3,
+        SuperAdmin = 1,
+        Staff = 2,
+        User = 3,
     }
 }

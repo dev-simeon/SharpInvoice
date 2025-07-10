@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SharpInvoice.Core.Domain.Entities;
+using SharpInvoice.Core.Domain.Shared;
 using SharpInvoice.Infrastructure.Persistence.Configurations;
 
 namespace SharpInvoice.Infrastructure.Persistence;
@@ -22,5 +23,39 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(UserConfiguration).Assembly);
         base.OnModelCreating(modelBuilder);
+    }
+    
+    public override int SaveChanges()
+    {
+        UpdateTimestamps();
+        return base.SaveChanges();
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        UpdateTimestamps();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void UpdateTimestamps()
+    {
+        var entries = ChangeTracker.Entries()
+            .Where(e => e.Entity is BaseEntity && (
+                e.State == EntityState.Added || 
+                e.State == EntityState.Modified));
+
+        foreach (var entityEntry in entries)
+        {
+            var entity = (BaseEntity)entityEntry.Entity;
+
+            if (entityEntry.State == EntityState.Added)
+            {
+                entity.SetCreatedNow();
+            }
+            else if (entityEntry.State == EntityState.Modified)
+            {
+                entity.SetUpdatedNow();
+            }
+        }
     }
 }
