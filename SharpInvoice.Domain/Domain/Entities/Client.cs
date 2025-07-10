@@ -2,29 +2,44 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using SharpInvoice.Core.Domain.Shared;
 
 public sealed class Client : BaseEntity
 {
-    private Client(Guid id, Guid businessId, string name) 
+    // Properties
+    public string Id { get; private init; }
+    public string BusinessId { get; private init; }
+    public Business Business { get; private init; } = null!;
+    public string Name { get; private set; }
+    public string? Email { get; private set; }
+    public string? Phone { get; private set; }
+    public string? Address { get; private set; }
+    public string? Country { get; private set; }
+    public string? Locale { get; private set; }
+
+    public ICollection<Invoice> Invoices { get; private set; } = [];
+
+    // Constructor
+    public Client(string businessId, string name, string? email = null, string? phone = null, string? address = null, string? country = null, string? locale = null)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(businessId);
+        
+        Id = KeyGenerator.Generate("client", name);
         BusinessId = businessId;
         Name = name;
+        Email = email;
+        Phone = phone;
+        Address = address;
+        Country = country;
+        Locale = locale;
     }
 
-    public static Client Create(Guid businessId, string name, string? email, string? phone)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Client name cannot be empty.", nameof(name));
-        var client = new Client(Guid.NewGuid(), businessId, name);
-        client.UpdateContactInfo(email, phone);
-        return client;
-    }
-
+    // Methods
     public void UpdateName(string newName)
     {
-        if (string.IsNullOrWhiteSpace(newName))
-            throw new ArgumentException("Client name cannot be empty.", nameof(newName));
+        ArgumentException.ThrowIfNullOrWhiteSpace(newName);
         Name = newName;
     }
 
@@ -40,19 +55,18 @@ public sealed class Client : BaseEntity
         Country = country;
         Locale = locale;
     }
-
-    public Guid BusinessId { get; private init; }
-    public string Name { get; private set; }
-    public string? Email { get; private set; }
-    public string? Phone { get; private set; }
-    public string? Address { get; private set; }
-    public string? Country { get; private set; }
-    public string? Locale { get; private set; }
-
-    private readonly List<Invoice> _invoices = [];
-    public IReadOnlyCollection<Invoice> Invoices => _invoices.AsReadOnly();
-
-
-    // EF Core
-    private Client() { Name = string.Empty; }
+    
+    /// <summary>
+    /// Overrides the Delete method to prevent deletion of clients with associated invoices.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown if the client has associated invoices</exception>
+    public new void Delete()
+    {
+        if (Invoices != null && Invoices.Any())
+        {
+            throw new InvalidOperationException("Cannot delete a client that has associated invoices.");
+        }
+        
+        base.Delete(); // Only mark as soft-deleted if no invoices exist
+    }
 }

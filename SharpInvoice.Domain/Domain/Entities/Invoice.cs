@@ -2,15 +2,52 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.ComponentModel.DataAnnotations.Schema;
-using SharpInvoice.Core.Domain.Shared;
+using System.Linq;
 using SharpInvoice.Core.Domain.Enums;
+using SharpInvoice.Core.Domain.Shared;
 
 public sealed class Invoice : BaseEntity
 {
-    private Invoice(Guid businessId, Guid clientId, string invoiceNumber, string currency) 
+    // Properties
+    public string Id { get; private init; }
+    public string BusinessId { get; private init; }
+    public Business Business { get; private init; } = null!;
+    public string ClientId { get; private init; }
+    public Client Client { get; private init; } = null!;
+    public string InvoiceNumber { get; private set; }
+    public DateTime IssueDate { get; private set; }
+    public DateTime DueDate { get; private set; }
+
+    [Column(TypeName = "decimal(18, 2)")]
+    public decimal SubTotal { get; private set; }
+
+    [Column(TypeName = "decimal(18, 2)")]
+    public decimal Tax { get; private set; }
+
+    [Column(TypeName = "decimal(18, 2)")]
+    public decimal Total { get; private set; }
+
+    [Column(TypeName = "decimal(18, 2)")]
+    public decimal AmountPaid { get; private set; }
+
+    public string Currency { get; private set; }
+    public InvoiceStatus Status { get; private set; }
+    public string? Notes { get; private set; }
+    public string? Terms { get; private set; }
+
+    public ICollection<InvoiceItem> Items { get; private set; } = [];
+    public ICollection<Transaction> Transactions { get; private set; } = [];
+
+    // Constructor
+    public Invoice(string businessId, string clientId, string invoiceNumber, string currency)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(businessId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(invoiceNumber);
+        ArgumentException.ThrowIfNullOrWhiteSpace(currency);
+
+        Id = KeyGenerator.Generate("inv", invoiceNumber);
         BusinessId = businessId;
         ClientId = clientId;
         InvoiceNumber = invoiceNumber;
@@ -20,25 +57,14 @@ public sealed class Invoice : BaseEntity
         DueDate = DateTime.UtcNow.AddDays(30);
     }
 
-    public static Invoice Create(Guid businessId, Guid clientId, string invoiceNumber, string currency, bool businessIsActive)
-    {
-        if (!businessIsActive)
-            throw new InvalidOperationException("Invoices cannot be added to an inactive business.");
-
-        if (string.IsNullOrWhiteSpace(invoiceNumber))
-            throw new ArgumentException("Invoice number cannot be empty.", nameof(invoiceNumber));
-
-        if (string.IsNullOrWhiteSpace(currency))
-            throw new ArgumentException("Currency cannot be empty.", nameof(currency));
-
-        return new Invoice(businessId, clientId, invoiceNumber, currency);
-    }
-
+    // Methods
     public void UpdateDetails(DateTime issueDate, DateTime dueDate, string? notes, string? terms)
     {
+        CheckBusinessIsActive();
+        
         if (issueDate.Date < DateTime.UtcNow.Date)
             throw new ArgumentException("Issue date cannot be in the past.", nameof(issueDate));
-        
+
         IssueDate = issueDate;
         DueDate = dueDate;
         Notes = notes;
@@ -47,75 +73,92 @@ public sealed class Invoice : BaseEntity
 
     public void AddItem(string description, decimal quantity, decimal unitPrice, string? unit)
     {
-        if (Status != InvoiceStatus.Draft) throw new InvalidOperationException("Cannot modify an invoice that is not a draft.");
-        var item = InvoiceItem.Create(Id, description, quantity, unitPrice, unit);
-        _items.Add(item);
+        CheckBusinessIsActive();
+        
+        if (Status != InvoiceStatus.Draft)
+            throw new InvalidOperationException("Cannot modify an invoice that is not a draft.");
+
+        var item = new InvoiceItem(Id, description, quantity, unitPrice, unit);
+        Items.Add(item);
         RecalculateTotals();
     }
 
-    public void RemoveItem(Guid itemId)
+    public void RemoveItem(string itemId)
     {
-        if (Status != InvoiceStatus.Draft) throw new InvalidOperationException("Cannot modify an invoice that is not a draft.");
-        var item = _items.FirstOrDefault(i => i.Id == itemId);
+        CheckBusinessIsActive();
+        
+        if (Status != InvoiceStatus.Draft)
+            throw new InvalidOperationException("Cannot modify an invoice that is not a draft.");
+
+        var item = Items.FirstOrDefault(i => i.Id == itemId);
         if (item != null)
         {
-            _items.Remove(item);
+            Items.Remove(item);
             RecalculateTotals();
         }
     }
 
     public void ApplyPayment(decimal amount, PaymentMethod method, string? externalId)
     {
-        if (Status == InvoiceStatus.Paid || Status == InvoiceStatus.Void) throw new InvalidOperationException("Cannot apply payment to a paid or voided invoice.");
-        var transaction = Transaction.Create(Id, amount, DateTime.UtcNow, method, externalId);
-        _transactions.Add(transaction);
+        CheckBusinessIsActive();
+        
+        if (Status == InvoiceStatus.Paid || Status == InvoiceStatus.Void)
+            throw new InvalidOperationException("Cannot apply payment to a paid or voided invoice.");
+
+        var transaction = new Transaction(Id, amount, DateTime.UtcNow, method, externalId);
+        Transactions.Add(transaction);
         AmountPaid += amount;
-        if (AmountPaid >= Total) Status = InvoiceStatus.Paid;
+        if (AmountPaid >= Total)
+            Status = InvoiceStatus.Paid;
     }
 
     public void MarkAsSent()
     {
-        if (_items.Count == 0) throw new InvalidOperationException("Cannot send an invoice with no items.");
-        if (Status == InvoiceStatus.Draft) Status = InvoiceStatus.Sent;
+        CheckBusinessIsActive();
+        
+        if (Items.Count == 0)
+            throw new InvalidOperationException("Cannot send an invoice with no items.");
+
+        if (Status == InvoiceStatus.Draft)
+            Status = InvoiceStatus.Sent;
     }
 
     public void Void()
     {
-        if (Status != InvoiceStatus.Paid) Status = InvoiceStatus.Void;
+        CheckBusinessIsActive();
+        
+        if (Status != InvoiceStatus.Paid)
+            Status = InvoiceStatus.Void;
+    }
+
+    /// <summary>
+    /// Overrides the Delete method to prevent invoices from being deleted.
+    /// Invoices are immutable financial records and should never be deleted.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Always thrown when attempting to delete an invoice</exception>
+    public new void Delete()
+    {
+        throw new InvalidOperationException("Invoices cannot be deleted as they are permanent financial records. Use Void() to mark an invoice as void instead.");
+    }
+
+    private void CheckBusinessIsActive()
+    {
+        if (Business != null && !Business.CanCreateInvoices())
+            throw new InvalidOperationException("Cannot modify invoices for an inactive or deleted business.");
     }
 
     private void RecalculateTotals()
     {
-        SubTotal = _items.Sum(i => i.Total);
-        Tax = SubTotal * 0.1m;
+        if (Items == null || !Items.Any())
+        {
+            SubTotal = 0;
+            Tax = 0;
+            Total = 0;
+            return;
+        }
+        
+        SubTotal = Items.Sum(i => i.Total);
+        Tax = SubTotal * 0.1m; // This should be made more flexible later
         Total = SubTotal + Tax;
     }
-
-    public Guid Id { get; private init; }
-    public Guid BusinessId { get; private init; }
-    public Guid ClientId { get; private init; }
-    public Client Client { get; private init; } = null!;
-    public string InvoiceNumber { get; private set; }
-    public DateTime IssueDate { get; private set; }
-    public DateTime DueDate { get; private set; }
-    [Column(TypeName = "decimal(18, 2)")]
-    public decimal SubTotal { get; private set; }
-    [Column(TypeName = "decimal(18, 2)")]
-    public decimal Tax { get; private set; }
-    [Column(TypeName = "decimal(18, 2)")]
-    public decimal Total { get; private set; }
-    [Column(TypeName = "decimal(18, 2)")]
-    public decimal AmountPaid { get; private set; }
-    public string Currency { get; private set; }
-    public InvoiceStatus Status { get; private set; }
-    public string? Notes { get; private set; }
-    public string? Terms { get; private set; }
-
-    private readonly List<InvoiceItem> _items = [];
-    public IReadOnlyCollection<InvoiceItem> Items => _items.AsReadOnly();
-
-    private readonly List<Transaction> _transactions = [];
-    public IReadOnlyCollection<Transaction> Transactions => _transactions.AsReadOnly();
-
-    private Invoice() { InvoiceNumber = string.Empty; Currency = string.Empty; Client = null!; }
 }

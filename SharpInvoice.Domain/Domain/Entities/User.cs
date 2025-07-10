@@ -1,32 +1,73 @@
 namespace SharpInvoice.Core.Domain.Entities;
 
-using System;
-using System.Security.Cryptography;
 using SharpInvoice.Core.Domain.Enums;
 using SharpInvoice.Core.Domain.Shared;
+using System.Security.Cryptography;
 
 public class User : BaseEntity
 {
-    public User(string email, string firstName, string lastName, string phoneNumber, string passwordHash, string emailToken)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(email, nameof(email));
-        ArgumentException.ThrowIfNullOrWhiteSpace(firstName, nameof(firstName));
-        ArgumentException.ThrowIfNullOrWhiteSpace(lastName, nameof(lastName));
-        ArgumentException.ThrowIfNullOrWhiteSpace(phoneNumber, nameof(phoneNumber));
-        ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash, nameof(passwordHash));
+    // Properties
+    public string Id { get; private init; }
+    public string Email { get; private set; }
+    public string FirstName { get; private set; }
+    public string LastName { get; private set; }
+    public ApplicationUserRole ApplicationUserRole { get; private set; }
+    public string FullName => $"{FirstName} {LastName}";
+    public string? AvatarUrl { get; private set; }
+    public string? PhoneNumber { get; private set; }
+    public string PasswordHash { get; private set; }
+    public bool EmailConfirmed { get; private set; }
+    public string? EmailConfirmationToken { get; private set; }
+    public DateTime? EmailConfirmationTokenExpiry { get; private set; }
+    public string? RefreshToken { get; private set; }
+    public DateTime? RefreshTokenExpiryTime { get; private set; }
+    public bool TwoFactorEnabled { get; private set; }
+    public string? TwoFactorCode { get; private set; }
+    public DateTime? TwoFactorCodeExpiry { get; private set; }
 
+    public ICollection<TeamMember> TeamMembers { get; private set; } = [];
+    public ICollection<ExternalLogin> ExternalLogins { get; private set; } = [];
+
+    // Factory & Constructor
+    public static User Register(string email, string firstName, string lastName, string passwordHash, string? phoneNumber = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        ArgumentException.ThrowIfNullOrWhiteSpace(firstName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(lastName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash);
+
+        return new User(email, firstName, lastName, passwordHash, ApplicationUserRole.USER, phoneNumber);
+    }
+
+    public static User CreateApplicationUser(string email, string firstName, string lastName, string passwordHash, ApplicationUserRole role, string? phoneNumber = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        ArgumentException.ThrowIfNullOrWhiteSpace(firstName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(lastName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash);
+
+        if (role == ApplicationUserRole.USER)
+            throw new ArgumentException("Cannot create an application user with the default 'USER' role. Use Register() instead.", nameof(role));
+
+        return new User(email, firstName, lastName, passwordHash, role, phoneNumber);
+    }
+
+    private User(string email, string firstName, string lastName, string passwordHash, ApplicationUserRole role, string? phoneNumber = null)
+    {
+        Id = KeyGenerator.Generate("user", $"{firstName}-{lastName}");
         Email = email;
         FirstName = firstName;
         LastName = lastName;
-        PhoneNumber = phoneNumber;
         PasswordHash = passwordHash;
-        EmailConfirmationToken = emailToken;
+        PhoneNumber = phoneNumber;
+        ApplicationUserRole = role;
     }
 
+    // Methods
     public void UpdateProfile(string firstName, string lastName)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(firstName, nameof(firstName));
-        ArgumentException.ThrowIfNullOrWhiteSpace(lastName, nameof(lastName));
+        ArgumentException.ThrowIfNullOrWhiteSpace(firstName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(lastName);
 
         FirstName = firstName;
         LastName = lastName;
@@ -51,11 +92,6 @@ public class User : BaseEntity
         RefreshTokenExpiryTime = null;
     }
 
-    public static void GeneratePasswordResetToken()
-    {
-        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-    }
-
     public void SetRefreshToken(string token, DateTime expiry)
     {
         RefreshToken = token;
@@ -77,14 +113,7 @@ public class User : BaseEntity
 
     public void ResetPassword(string newPasswordHash)
     {
-        if (string.IsNullOrWhiteSpace(newPasswordHash))
-            throw new ArgumentException("Password hash cannot be empty.", nameof(newPasswordHash));
-        PasswordHash = newPasswordHash;
-    }
-
-    public void SetPasswordHash(string newPasswordHash)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(newPasswordHash, nameof(newPasswordHash));
+        ArgumentException.ThrowIfNullOrWhiteSpace(newPasswordHash);
         PasswordHash = newPasswordHash;
     }
 
@@ -108,25 +137,4 @@ public class User : BaseEntity
         TwoFactorCode = null;
         TwoFactorCodeExpiry = null;
     }
-
-    public int Id { get; private init; }
-    public string Email { get; private init; }
-    public string FirstName { get; private set; }
-    public string LastName { get; private set; }
-    public ApplicationUserRole ApplicationUserRole { get; private set; }
-    public string FullName => $"{FirstName} {LastName}";
-    public string? AvatarUrl { get; private set; }
-    public string? PhoneNumber { get; private set; }
-    public string PasswordHash { get; private set; }
-    public bool EmailConfirmed { get; private set; }
-    public string? EmailConfirmationToken { get; private set; }
-    public DateTime? EmailConfirmationTokenExpiry { get; private set; }
-    public string? RefreshToken { get; private set; }
-    public DateTime? RefreshTokenExpiryTime { get; private set; }
-    public bool TwoFactorEnabled { get; private set; }
-    public string? TwoFactorCode { get; private set; }
-    public DateTime? TwoFactorCodeExpiry { get; private set; }
-    //public ICollection<ExternalLogin> ExternalLogins { get; private set; } = new List<ExternalLogin>();
-
-    private User() { }
 }
