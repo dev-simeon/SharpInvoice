@@ -5,12 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Scalar.AspNetCore;
 using Serilog;
-using SharpInvoice.Core.Interfaces;
-using SharpInvoice.Core.Interfaces.Repositories;
-using SharpInvoice.Core.Interfaces.Services;
-using SharpInvoice.Infrastructure;
 using SharpInvoice.Infrastructure.Persistence;
-using SharpInvoice.Infrastructure.Repositories;
 using SharpInvoice.Infrastructure.Services;
 using SharpInvoice.Infrastructure.Shared;
 using System.Text;
@@ -38,10 +33,11 @@ try
     // B. Infrastructure Services (Database, Repositories, Services)
     builder.Services.AddInfrastructureServices(builder.Configuration);
 
-    // C. Authentication & Authorization
+    
     var appSettings = builder.Configuration.GetSection("AppSettings").Get<AppSettings>()
         ?? throw new InvalidOperationException("AppSettings is missing or invalid. Check your configuration.");
-    
+
+    // C. Authentication & Authorization
     builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -79,7 +75,7 @@ try
             try {
                 using var context = new AppDbContext(
                     new DbContextOptionsBuilder<AppDbContext>()
-                        .UseSqlServer(appSettings.ConnectionStrings.SqlDbRemote)
+                        .UseSqlServer(appSettings.ConnectionStrings.SqlDbLocal)
                         .Options);
                 context.Database.CanConnect();
                 return HealthCheckResult.Healthy();

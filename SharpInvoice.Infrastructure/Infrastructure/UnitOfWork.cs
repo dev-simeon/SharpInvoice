@@ -67,5 +67,6 @@ public class UnitOfWork(
     public void Dispose()
     {
         context.Dispose();
+        GC.SuppressFinalize(this);
     }
 } 

@@ -31,7 +31,7 @@ public static class ServiceCollectionExtensions
         // Register DbContext
         services.AddDbContext<AppDbContext>(options =>
             options.UseSqlServer(
-                appSettings.ConnectionStrings.SqlDbRemote,
+                appSettings.ConnectionStrings.SqlDbLocal,
                 sqlOptions => sqlOptions.EnableRetryOnFailure(
                     maxRetryCount: 5,
                     maxRetryDelay: TimeSpan.FromSeconds(10),
