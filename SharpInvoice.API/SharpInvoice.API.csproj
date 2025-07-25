@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+	<RootNamespace>SharpInvoice.API</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+	  <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.0" />
+	  <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.7" />
+	  <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.7" />
+	  <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="9.0.7" />
+	  <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="9.0.7" />
+	  <PackageReference Include="Scalar.AspNetCore" Version="2.6.4" />
+	  <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+	  <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+	  <PackageReference Include="Serilog.Enrichers.Thread" Version="4.0.0" />
+	  <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+	  <PackageReference Include="FluentValidation" Version="12.0.0" />
+	  <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.0.0" />
+	  <PackageReference Include="AutoMapper" Version="15.0.1" />
+
+	  <PackageReference Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.4.0" />
+	  <PackageReference Include="Azure.Identity" Version="1.14.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+	  <ProjectReference Include="..\SharpInvoice.Infrastructure\SharpInvoice.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Filters\" />
+    <Folder Include="Documentation\" />
+    <Folder Include="Configurations\" />
+    <Folder Include="Settings\" />
+  </ItemGroup>
+
+</Project>
